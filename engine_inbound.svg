@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <circle cx="32" cy="32" r="31" fill="#ffffff" stroke="#003087" stroke-width="2"/>
+  <!-- motion lines (behind = left) -->
+  <g stroke="#9fb6d9" stroke-width="2.5" stroke-linecap="round">
+    <line x1="6" y1="26" x2="14" y2="26"/>
+    <line x1="4" y1="32" x2="13" y2="32"/>
+    <line x1="6" y1="38" x2="14" y2="38"/>
+  </g>
+  <!-- body with sloped nose to the right -->
+  <path d="M17 22 h27 q6 0 8.5 6 l1.5 4 v6 q0 3 -3 3 h-34 q-3 0 -3 -3 v-13 q0 -3 3 -3 z" fill="#003087"/>
+  <!-- windshield -->
+  <path d="M44 25.5 q4 .5 6 4.5 l-7 0 z" fill="#cfe0f4"/>
+  <!-- side windows -->
+  <rect x="20" y="25.5" width="6" height="5" rx="1" fill="#cfe0f4"/>
+  <rect x="29" y="25.5" width="6" height="5" rx="1" fill="#cfe0f4"/>
+  <!-- orange stripe -->
+  <rect x="14" y="35.5" width="40" height="3.2" fill="#f7941d"/>
+  <!-- headlight -->
+  <circle cx="52.5" cy="33.5" r="1.6" fill="#ffe066"/>
+  <!-- wheels -->
+  <g fill="#1a1a1a">
+    <circle cx="22" cy="43" r="3.4"/><circle cx="31" cy="43" r="3.4"/>
+    <circle cx="41" cy="43" r="3.4"/><circle cx="49" cy="43" r="3.4"/>
+  </g>
+  <g fill="#6b7280">
+    <circle cx="22" cy="43" r="1.2"/><circle cx="31" cy="43" r="1.2"/>
+    <circle cx="41" cy="43" r="1.2"/><circle cx="49" cy="43" r="1.2"/>
+  </g>
+</svg>
