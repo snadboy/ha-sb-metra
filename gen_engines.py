@@ -40,7 +40,7 @@ def main():
     lines_cust = []
     for line, color in LINE_COLORS.items():
         sl = slug(line)
-        body = template.replace("#003087", color)
+        body = template.replace("#0050a0", color)   # the F40PH template's body blue
         if luminance(color) > 0.55:  # light line color -> dark wordmark
             body = body.replace('font-style="italic" fill="#ffffff" text-anchor="middle"',
                                 'font-style="italic" fill="#1a1a1a" text-anchor="middle"')
@@ -49,7 +49,7 @@ def main():
         for d in ("inbound", "outbound"):
             for i in range(1, 13):
                 lines_cust.append(f"sensor.metra_{sl}_map_{d}_{i}:\n"
-                                  f"  entity_picture: /local/metra/engine_{sl}_{d}.svg\n")
+                                  f"  entity_picture: /local/metra/engine_{sl}_{d}.svg?v=2\n")
     print("".join(lines_cust))
 
 if __name__ == "__main__":

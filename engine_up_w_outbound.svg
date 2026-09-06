@@ -18,7 +18,7 @@
       <circle cx="42.5" cy="46" r=".9"/><circle cx="48.5" cy="46" r=".9"/>
     </g>
     <!-- blue body, sloped cab nose to the right -->
-    <path d="M9 24 h38 l5.5 3.5 q2.5 2 2.5 4.5 v6 q0 2 -2 2 h-42 q-2 0 -2 -2 z" fill="#0050a0"/>
+    <path d="M9 24 h38 l5.5 3.5 q2.5 2 2.5 4.5 v6 q0 2 -2 2 h-42 q-2 0 -2 -2 z" fill="#FE8D81"/>
     <!-- red roof -->
     <path d="M9 21.5 h36 q2 0 3.5 1.2 l2 1.6 -41.5 0 z" fill="#e03a3e"/>
     <!-- roof vents -->
