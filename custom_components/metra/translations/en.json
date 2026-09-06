@@ -1,0 +1,37 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Metra API token",
+        "data": { "api_token": "API token (metra.com/developers)" }
+      }
+    },
+    "error": { "cannot_connect": "Token rejected by the Metra GTFS API" },
+    "abort": { "already_configured": "Metra is already configured" }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Metra options",
+        "data": {
+          "lines": "Lines to publish",
+          "map_lines": "Lines with map position slots",
+          "map_slots": "Map slots per direction"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "favorite": {
+      "title": "Commute pair",
+      "step": {
+        "user": {
+          "title": "Add a commute pair",
+          "data": { "line": "Line", "origin": "Origin station", "destination": "Destination station" }
+        }
+      },
+      "initiate_flow": { "user": "Add commute pair" },
+      "entry_type": "Commute pair"
+    }
+  }
+}

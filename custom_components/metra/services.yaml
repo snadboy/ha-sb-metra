@@ -1,0 +1,92 @@
+schedule:
+  name: Schedule
+  description: Every scheduled train on a line for one service day (static timetable).
+  fields:
+    line:
+      name: Line
+      required: true
+      example: UP-W
+      selector:
+        select:
+          options: [BNSF, HC, MD-N, MD-W, ME, NCS, RI, SWS, UP-N, UP-NW, UP-W]
+    date:
+      name: Date
+      description: Service day (default today). Weekday and weekend schedules differ.
+      selector:
+        date:
+
+arrivals:
+  name: Arrivals
+  description: Next trains arriving at one station, both directions, live overlay.
+  fields:
+    line:
+      name: Line
+      required: true
+      selector:
+        select:
+          options: [BNSF, HC, MD-N, MD-W, ME, NCS, RI, SWS, UP-N, UP-NW, UP-W]
+    station:
+      name: Station
+      required: true
+      description: Station name or GTFS stop id (case-insensitive substring).
+      example: Wheaton
+      selector:
+        text:
+    n:
+      name: Number of arrivals
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 20
+
+query:
+  name: Next trains
+  description: Next trains between two stations on a line (express-aware, live overlay).
+  fields:
+    line:
+      name: Line
+      required: true
+      selector:
+        select:
+          options: [BNSF, HC, MD-N, MD-W, ME, NCS, RI, SWS, UP-N, UP-NW, UP-W]
+    origin:
+      name: Origin station
+      required: true
+      example: Geneva
+      selector:
+        text:
+    destination:
+      name: Destination station
+      required: true
+      example: Chicago OTC
+      selector:
+        text:
+    n:
+      name: Number of trains
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 10
+
+train:
+  name: Train detail
+  description: One train's timetable with live overlay (per-stop ETA, passed flags, position, delay). Train numbers differ between weekday and weekend service.
+  fields:
+    line:
+      name: Line
+      required: true
+      selector:
+        select:
+          options: [BNSF, HC, MD-N, MD-W, ME, NCS, RI, SWS, UP-N, UP-NW, UP-W]
+    train:
+      name: Train number
+      required: true
+      example: "70"
+      selector:
+        text:
+    date:
+      name: Date
+      selector:
+        date:

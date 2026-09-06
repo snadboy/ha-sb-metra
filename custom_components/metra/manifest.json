@@ -1,0 +1,12 @@
+{
+  "domain": "metra",
+  "name": "Metra",
+  "codeowners": ["@snadboy"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/snadboy/claude-env",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "requirements": ["gtfs-realtime-bindings"],
+  "version": "1.0.0"
+}
