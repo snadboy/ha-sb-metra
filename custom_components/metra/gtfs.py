@@ -424,7 +424,19 @@ def schedule_span(idx, line, start: date, days: int = 28):
         if counts:
             modal[c] = counts.most_common(1)[0][0]
 
-    fp_key = {fp: c for c, fp in modal.items()}
+    # lines where saturday and sunday timetables are identical (e.g. BNSF)
+    # get one honest "weekend" pattern instead of sunday swallowing saturday
+    fp_key = {}
+    if "weekday" in modal:
+        fp_key[modal["weekday"]] = "weekday"
+    sat, sun = modal.get("saturday"), modal.get("sunday")
+    if sat is not None and sat == sun:
+        fp_key.setdefault(sat, "weekend")
+    else:
+        if sat is not None:
+            fp_key.setdefault(sat, "saturday")
+        if sun is not None:
+            fp_key.setdefault(sun, "sunday")
     patterns, days_list = {}, []
     for d in sorted(scheds):
         fp = fps[d]
