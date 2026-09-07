@@ -369,6 +369,24 @@ def schedule_day(idx, line, d: date):
     return {"line": line, "date": d.isoformat(), "count": len(trains), "trains": trains}
 
 
+def schedule_span(idx, line, start: date, days: int = 28):
+    """Next-N-days outlook, deduplicated: most days share a service pattern
+    (weekday/saturday/sunday/holiday), so each distinct timetable is stored
+    once in `patterns` and `days` just references it."""
+    days_list, patterns, fp_key = [], {}, {}
+    for off in range(days):
+        d = start + timedelta(days=off)
+        sched = schedule_day(idx, line, d)
+        fp = hash(tuple((t["train"], t["departs"]) for t in sched["trains"]))
+        if fp not in fp_key:
+            base = "weekday" if d.weekday() < 5 else d.strftime("%A").lower()
+            key = base if base not in patterns else d.isoformat()
+            fp_key[fp] = key
+            patterns[key] = {"count": sched["count"], "trains": sched["trains"]}
+        days_list.append({"date": d.isoformat(), "day": d.strftime("%A"), "pattern": fp_key[fp]})
+    return days_list, patterns
+
+
 def arrivals(idx, line, station_needle, rt, n=5):
     station = resolve_stop(idx, line, station_needle)
     rt_line = rt.get(line, {})

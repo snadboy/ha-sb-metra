@@ -31,6 +31,7 @@ class MetraCoordinator(DataUpdateCoordinator):
         self.entry = entry
         self.token: str = entry.data["api_token"]
         self.idx: dict | None = None
+        self._span_cache: dict = {}
 
     def _lines(self) -> list[str]:
         opts = self.entry.options.get("lines")
@@ -57,10 +58,17 @@ class MetraCoordinator(DataUpdateCoordinator):
             "updated": now.strftime("%H:%M"),
             "active": {}, "schedule": {}, "favorites": {},
         }
+        span_key = (today.isoformat(), self.idx["version"], tuple(data["lines"]))
+        if self._span_cache.get("key") != span_key:
+            self._span_cache = {"key": span_key, "lines": {
+                line: gtfs.schedule_span(self.idx, line, today) for line in data["lines"]}}
         for line in data["lines"]:
             data["active"][line] = gtfs.active_trains(
                 self.idx, line, rt.get(line, {}), pos.get(line, {}))
             data["schedule"][line] = gtfs.schedule_day(self.idx, line, today)
+            days_list, patterns = self._span_cache["lines"][line]
+            data["schedule"][line]["days"] = days_list
+            data["schedule"][line]["patterns"] = patterns
         for sub in self.entry.subentries.values():
             if sub.subentry_type != "favorite":
                 continue

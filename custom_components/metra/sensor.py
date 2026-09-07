@@ -102,6 +102,7 @@ class TodayScheduleSensor(MetraBase):
     def extra_state_attributes(self):
         sched = self.coordinator.data["schedule"].get(self.line, {})
         return {"date": sched.get("date"), "trains": sched.get("trains", []),
+                "days": sched.get("days", []), "patterns": sched.get("patterns", {}),
                 "updated": self.coordinator.data["updated"]}
 
 
