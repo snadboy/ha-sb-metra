@@ -399,33 +399,43 @@ def schedule_day(idx, line, d: date, services=None):
 
 
 def schedule_span(idx, line, start: date, days: int = 28):
-    """Next-N-days outlook, deduplicated: most days share a service pattern
-    (weekday/saturday/sunday/holiday), so each distinct timetable is stored
-    once in `patterns` and `days` just references it."""
-    line_svcs = {tr["service"] for tr in idx["trips"].values() if tr["route"] == line}
-    days_list, patterns, fp_key = [], {}, {}
+    """Next-N-days outlook, deduplicated by service pattern.
+
+    A day is holiday-flagged when its timetable differs from the MODAL pattern
+    for its day-of-week category (rider semantics: 'Monday running sunday
+    service' flags; GTFS bookkeeping like exception-driven service-id swaps
+    that produce an identical timetable does not).
+    """
+    from collections import Counter
+
+    scheds, fps = {}, {}
     for off in range(days):
         d = start + timedelta(days=off)
         sched = schedule_day(idx, line, d)
-        fp = hash(tuple((t["train"], t["departs"]) for t in sched["trains"]))
+        scheds[d] = sched
+        fps[d] = hash(tuple((t["train"], t["departs"]) for t in sched["trains"]))
+
+    def cat(d: date) -> str:
+        return "weekday" if d.weekday() < 5 else d.strftime("%A").lower()
+
+    modal = {}
+    for c in ("weekday", "saturday", "sunday"):
+        counts = Counter(fps[d] for d in scheds if cat(d) == c)
+        if counts:
+            modal[c] = counts.most_common(1)[0][0]
+
+    fp_key = {fp: c for c, fp in modal.items()}
+    patterns, days_list = {}, []
+    for d in sorted(scheds):
+        fp = fps[d]
         if fp not in fp_key:
-            base = "weekday" if d.weekday() < 5 else d.strftime("%A").lower()
-            key = base if base not in patterns else d.isoformat()
-            fp_key[fp] = key
-            patterns[key] = {"count": sched["count"], "trains": sched["trains"]}
-        entry = {"date": d.isoformat(), "day": d.strftime("%A"), "pattern": fp_key[fp]}
-        # holiday-modified = the ACTUAL timetable differs from what the plain
-        # weekly calendar would run (exceptions that swap equivalent service
-        # ids without changing any train are deliberately NOT flagged)
-        ds = d.strftime("%Y%m%d")
-        dow = DAYS[d.weekday()]
-        base_set = {r["service_id"] for r in idx["calendar"]
-                    if r.get(dow) == "1" and r["start_date"] <= ds <= r["end_date"]}
-        if (base_set & line_svcs) != (active_services(idx, d) & line_svcs):
-            base_sched = schedule_day(idx, line, d, services=base_set)
-            base_fp = hash(tuple((t["train"], t["departs"]) for t in base_sched["trains"]))
-            if base_fp != fp:
-                entry["holiday"] = us_holiday_name(d) or "modified service"
+            fp_key[fp] = d.isoformat()
+        key = fp_key[fp]
+        if key not in patterns:
+            patterns[key] = {"count": scheds[d]["count"], "trains": scheds[d]["trains"]}
+        entry = {"date": d.isoformat(), "day": d.strftime("%A"), "pattern": key}
+        if cat(d) in modal and fp != modal[cat(d)]:
+            entry["holiday"] = us_holiday_name(d) or "modified service"
         days_list.append(entry)
     return days_list, patterns
 
