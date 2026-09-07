@@ -424,31 +424,34 @@ def schedule_span(idx, line, start: date, days: int = 28):
         if counts:
             modal[c] = counts.most_common(1)[0][0]
 
-    # lines where saturday and sunday timetables are identical (e.g. BNSF)
-    # get one honest "weekend" pattern instead of sunday swallowing saturday
-    fp_key = {}
-    if "weekday" in modal:
-        fp_key[modal["weekday"]] = "weekday"
-    sat, sun = modal.get("saturday"), modal.get("sunday")
-    if sat is not None and sat == sun:
-        fp_key.setdefault(sat, "weekend")
-    else:
-        if sat is not None:
-            fp_key.setdefault(sat, "saturday")
-        if sun is not None:
-            fp_key.setdefault(sun, "sunday")
-    patterns, days_list = {}, []
+    patterns, days_list, extra_key = {}, {}, {}
+    days_list = []
     for d in sorted(scheds):
-        fp = fps[d]
-        if fp not in fp_key:
-            fp_key[fp] = d.isoformat()
-        key = fp_key[fp]
+        fp, c = fps[d], cat(d)
+        # CONSISTENT key vocabulary: weekday/saturday/sunday always (identical
+        # sat+sun timetables appear under BOTH keys), date-keys only for
+        # one-off special schedules matching no category's modal timetable
+        if c in modal and fp == modal[c]:
+            key = c
+        else:
+            other = next((oc for oc, ofp in modal.items() if ofp == fp), None)
+            if other:
+                key = other          # e.g. Labor Day Monday -> "sunday"
+            elif fp in extra_key:
+                key = extra_key[fp]
+            else:
+                extra_key[fp] = d.isoformat()
+                key = extra_key[fp]
         if key not in patterns:
             patterns[key] = {"count": scheds[d]["count"], "trains": scheds[d]["trains"]}
         entry = {"date": d.isoformat(), "day": d.strftime("%A"), "pattern": key}
-        if cat(d) in modal and fp != modal[cat(d)]:
+        if c in modal and fp != modal[c]:
             entry["holiday"] = us_holiday_name(d) or "modified service"
         days_list.append(entry)
+    for c, fp in modal.items():
+        if c not in patterns:
+            src = next(d for d in scheds if fps[d] == fp)
+            patterns[c] = {"count": scheds[src]["count"], "trains": scheds[src]["trains"]}
     return days_list, patterns
 
 
