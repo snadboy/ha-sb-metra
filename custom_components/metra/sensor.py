@@ -80,7 +80,7 @@ class ActiveTrainsSensor(MetraBase):
 
 
 class TodayScheduleSensor(MetraBase):
-    _attr_name = "Today schedule"
+    _attr_name = "Schedule"
     _attr_icon = "mdi:timetable"
 
     def __init__(self, coordinator: MetraCoordinator, line: str) -> None:
@@ -88,7 +88,7 @@ class TodayScheduleSensor(MetraBase):
         self.line = line
         self._attr_unique_id = f"{DOMAIN}_line_{slug(line)}_today_schedule"
         self._attr_device_info = _line_device(line, coordinator.data["routes"])
-        self.entity_id = f"sensor.metra_{slug(line)}_today_schedule"
+        self.entity_id = f"sensor.metra_{slug(line)}_schedule"
 
     @property
     def available(self) -> bool:

@@ -146,6 +146,34 @@ def active_services(idx: dict, d: date) -> set:
     return active
 
 
+def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
+    d = date(year, month, 1)
+    d += timedelta(days=(weekday - d.weekday()) % 7)
+    return d + timedelta(weeks=n - 1)
+
+
+def us_holiday_name(d: date) -> str | None:
+    """Names for the majors (GTFS carries no holiday names)."""
+    y = d.year
+    fixed = {(1, 1): "New Year's Day", (6, 19): "Juneteenth",
+             (7, 4): "Independence Day", (11, 11): "Veterans Day",
+             (12, 25): "Christmas Day"}
+    if (d.month, d.day) in fixed:
+        return fixed[(d.month, d.day)]
+    floating = {
+        _nth_weekday(y, 1, 0, 3): "MLK Day",
+        _nth_weekday(y, 2, 0, 3): "Presidents' Day",
+        _nth_weekday(y, 9, 0, 1): "Labor Day",
+        _nth_weekday(y, 10, 0, 2): "Columbus Day",
+        _nth_weekday(y, 11, 3, 4): "Thanksgiving",
+    }
+    memorial = _nth_weekday(y, 5, 0, 5)
+    if memorial.month != 5:
+        memorial -= timedelta(weeks=1)
+    floating[memorial] = "Memorial Day"
+    return floating.get(d)
+
+
 def gtfs_dt(service_day: date, hms: str) -> datetime:
     h, m, s = (int(x) for x in hms.split(":"))
     return datetime(service_day.year, service_day.month, service_day.day, tzinfo=TZ) + timedelta(
@@ -345,8 +373,9 @@ def active_trains(idx, line, rt_line, pos_line):
     return [{k: v for k, v in t.items() if k != "_sort"} for t in out]
 
 
-def schedule_day(idx, line, d: date):
-    services = active_services(idx, d)
+def schedule_day(idx, line, d: date, services=None):
+    if services is None:
+        services = active_services(idx, d)
     names = idx["names"]
     out = []
     for tid, tr in idx["trips"].items():
@@ -373,6 +402,7 @@ def schedule_span(idx, line, start: date, days: int = 28):
     """Next-N-days outlook, deduplicated: most days share a service pattern
     (weekday/saturday/sunday/holiday), so each distinct timetable is stored
     once in `patterns` and `days` just references it."""
+    line_svcs = {tr["service"] for tr in idx["trips"].values() if tr["route"] == line}
     days_list, patterns, fp_key = [], {}, {}
     for off in range(days):
         d = start + timedelta(days=off)
@@ -383,7 +413,20 @@ def schedule_span(idx, line, start: date, days: int = 28):
             key = base if base not in patterns else d.isoformat()
             fp_key[fp] = key
             patterns[key] = {"count": sched["count"], "trains": sched["trains"]}
-        days_list.append({"date": d.isoformat(), "day": d.strftime("%A"), "pattern": fp_key[fp]})
+        entry = {"date": d.isoformat(), "day": d.strftime("%A"), "pattern": fp_key[fp]}
+        # holiday-modified = the ACTUAL timetable differs from what the plain
+        # weekly calendar would run (exceptions that swap equivalent service
+        # ids without changing any train are deliberately NOT flagged)
+        ds = d.strftime("%Y%m%d")
+        dow = DAYS[d.weekday()]
+        base_set = {r["service_id"] for r in idx["calendar"]
+                    if r.get(dow) == "1" and r["start_date"] <= ds <= r["end_date"]}
+        if (base_set & line_svcs) != (active_services(idx, d) & line_svcs):
+            base_sched = schedule_day(idx, line, d, services=base_set)
+            base_fp = hash(tuple((t["train"], t["departs"]) for t in base_sched["trains"]))
+            if base_fp != fp:
+                entry["holiday"] = us_holiday_name(d) or "modified service"
+        days_list.append(entry)
     return days_list, patterns
 
 
