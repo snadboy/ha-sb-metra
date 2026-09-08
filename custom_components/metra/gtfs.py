@@ -392,7 +392,11 @@ def schedule_day(idx, line, d: date, services=None):
                     "origin": names.get(o_id, o_id), "departs": dep.strftime("%H:%M"),
                     "destination": names.get(d_id, d_id),
                     "arrives": gtfs_dt(d, d_arr).strftime("%H:%M"),
-                    "stops": len(ordered), "_sort": dep.timestamp()})
+                    "stops": len(ordered),
+                    "stations": [{"station": names.get(sid, sid),
+                                  "time": gtfs_dt(d, arr).strftime("%H:%M")}
+                                 for sid, (_sq, _dp, arr) in ordered],
+                    "_sort": dep.timestamp()})
     out.sort(key=lambda t: t["_sort"])
     trains = [{k: v for k, v in t.items() if k != "_sort"} for t in out]
     return {"line": line, "date": d.isoformat(), "count": len(trains), "trains": trains}
