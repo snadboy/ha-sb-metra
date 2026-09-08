@@ -47,7 +47,7 @@ def _fetch(url: str, timeout: int = 20) -> bytes:
 
 
 def train_token(trip_id: str) -> str:
-    m = re.search(r"_([A-Z]{2,4}\d+)_", trip_id + "_")
+    m = re.search(r"_([A-Z]{2,6}\d+)_", trip_id + "_")   # 6 covers UNRAV1 (Ravinia specials)
     return m.group(1) if m else trip_id
 
 
