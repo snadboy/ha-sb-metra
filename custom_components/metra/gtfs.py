@@ -412,9 +412,15 @@ def schedule_span(idx, line, start: date, days: int = 28):
     """
     from collections import Counter
 
+    # clamp to the GTFS calendar horizon — beyond it every day is an empty
+    # phantom "special" that would spam modified-service flags
+    horizon = max((r["end_date"] for r in idx["calendar"]), default="99991231")
+    horizon_d = date(int(horizon[:4]), int(horizon[4:6]), int(horizon[6:8]))
     scheds, fps = {}, {}
     for off in range(days):
         d = start + timedelta(days=off)
+        if d > horizon_d:
+            break
         sched = schedule_day(idx, line, d)
         scheds[d] = sched
         fps[d] = hash(tuple((t["train"], t["departs"]) for t in sched["trains"]))

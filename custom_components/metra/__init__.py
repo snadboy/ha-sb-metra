@@ -46,6 +46,10 @@ class MetraCoordinator(DataUpdateCoordinator):
     def map_slots(self) -> int:
         return int(self.entry.options.get("map_slots", 12))
 
+    @property
+    def span_days(self) -> int:
+        return int(self.entry.options.get("span_days", 28))
+
     def _compute(self) -> dict:
         self.idx = gtfs.load_index()
         rt, pos = gtfs.realtime(self.token)
@@ -58,10 +62,10 @@ class MetraCoordinator(DataUpdateCoordinator):
             "updated": now.strftime("%H:%M"),
             "active": {}, "schedule": {}, "favorites": {},
         }
-        span_key = (today.isoformat(), self.idx["version"], tuple(data["lines"]))
+        span_key = (today.isoformat(), self.idx["version"], tuple(data["lines"]), self.span_days)
         if self._span_cache.get("key") != span_key:
             self._span_cache = {"key": span_key, "lines": {
-                line: gtfs.schedule_span(self.idx, line, today) for line in data["lines"]}}
+                line: gtfs.schedule_span(self.idx, line, today, days=self.span_days) for line in data["lines"]}}
         for line in data["lines"]:
             data["active"][line] = gtfs.active_trains(
                 self.idx, line, rt.get(line, {}), pos.get(line, {}))

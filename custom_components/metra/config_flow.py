@@ -86,6 +86,8 @@ class MetraOptionsFlow(OptionsFlow):
                     SelectSelectorConfig(options=ids, multiple=True)),
                 vol.Required("map_slots", default=opts.get("map_slots", 12)): NumberSelector(
                     NumberSelectorConfig(min=1, max=12, step=1, mode="box")),
+                vol.Required("span_days", default=opts.get("span_days", 28)): NumberSelector(
+                    NumberSelectorConfig(min=7, max=190, step=1, mode="box")),
             }),
         )
 
