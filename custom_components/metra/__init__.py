@@ -19,8 +19,37 @@ from . import gtfs
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = ["sensor"]
+PLATFORMS = ["select", "sensor"]
 UPDATE_INTERVAL = timedelta(minutes=2)
+
+
+class MetraSelection:
+    """The line the selects are pointed at, shared between select entities.
+
+    Holding it here (rather than having the station selects watch
+    select.metra_line by entity_id) keeps the dependency inside the
+    integration, so the entity ids stay a presentation detail.
+    """
+
+    def __init__(self) -> None:
+        self.line: str | None = None
+        self._listeners: list = []
+
+    def subscribe(self, cb) -> callable:
+        self._listeners.append(cb)
+
+        def _unsub() -> None:
+            if cb in self._listeners:
+                self._listeners.remove(cb)
+
+        return _unsub
+
+    def set_line(self, line: str | None) -> None:
+        if line == self.line:
+            return
+        self.line = line
+        for cb in list(self._listeners):
+            cb()
 
 
 class MetraCoordinator(DataUpdateCoordinator):
@@ -32,6 +61,17 @@ class MetraCoordinator(DataUpdateCoordinator):
         self.token: str = entry.data["api_token"]
         self.idx: dict | None = None
         self._span_cache: dict = {}
+        self._stops_cache: dict = {}
+        self.selection = MetraSelection()
+
+    def stops(self, line: str) -> list[str]:
+        """Route-ordered stop names for a line; recomputed only on feed change."""
+        if not self.idx:
+            return []
+        key = (self.idx["version"], line)
+        if key not in self._stops_cache:
+            self._stops_cache = {key: gtfs.line_stops(self.idx, line)}
+        return self._stops_cache[key]
 
     def _lines(self) -> list[str]:
         opts = self.entry.options.get("lines")

@@ -252,6 +252,44 @@ def resolve_stop(idx: dict, line: str, needle: str) -> str:
                      + ("no match" if not part else "ambiguous: " + ", ".join(sorted(part))))
 
 
+def line_stops(idx: dict, line: str) -> list[str]:
+    """Stop display names for a line, in route order (not alphabetical).
+
+    Seeded from the longest trip on the line, ordered by stop_sequence. Stops
+    that appear only on other trips are inserted after the nearest preceding
+    stop already placed. A branch trip starts on the branch, so its first stop
+    has no placed predecessor and the whole branch lands as one contiguous
+    block after the trunk, in its own route order -- verified on ME, which is
+    a trunk plus the Blue Island and South Chicago branches. That reads better
+    than interleaving branch stops into the trunk at the divergence point.
+    """
+    trips = [(tid, st) for tid, st in idx["trip_stops"].items()
+             if idx["trips"].get(tid, {}).get("route") == line and st]
+    if not trips:
+        return []
+
+    def ordered(st: dict) -> list[str]:
+        return [sid for sid, v in sorted(st.items(), key=lambda kv: kv[1][0])]
+
+    trips.sort(key=lambda t: len(t[1]), reverse=True)
+    out = ordered(trips[0][1])
+    seen = set(out)
+    for _tid, st in trips[1:]:
+        seq = ordered(st)
+        for i, sid in enumerate(seq):
+            if sid in seen:
+                continue
+            anchor = next((s for s in reversed(seq[:i]) if s in seen), None)
+            out.insert(out.index(anchor) + 1 if anchor else len(out), sid)
+            seen.add(sid)
+    names, out_names = idx["names"], []
+    for sid in out:                       # options must be unique: dedupe by
+        nm = names.get(sid, sid)          # display name, keeping route order
+        if nm not in out_names:
+            out_names.append(nm)
+    return out_names
+
+
 def check_line(idx: dict, line: str) -> None:
     if line not in {r["id"] for r in idx["routes"]}:
         raise ValueError(f"unknown line {line}; lines: "
