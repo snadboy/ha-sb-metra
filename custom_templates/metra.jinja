@@ -1,0 +1,72 @@
+{#
+  Metra service browser -- one collapsible timetable browser for a Metra line.
+  Source of truth: ~/projects/tools/metra/custom_templates/metra.jinja (claude-env).
+  Deployed copy: /config/custom_templates/metra.jinja -- run
+  homeassistant.reload_custom_templates after changing it.
+
+  Usage in a markdown card:
+    {%- from 'metra.jinja' import service_browser -%}
+    {{- service_browser('sensor.metra_md_n_schedule') | safe -}}
+#}
+{% macro service_browser(line_ent) %}
+{% set days = state_attr(line_ent,'days') or [] %}
+{% set patterns = state_attr(line_ent,'patterns') or {} %}
+{% set friendly = state_attr(line_ent, 'friendly_name') or '' %}
+<b><u>{{ friendly }}</u></b>
+{% if days %}
+{% set day_first = days[0] %}
+{% set day_last = days[days|count - 1] %}
+{%- set nsl = namespace(m={}) %}
+{%- for k in patterns.keys() %}
+{%- set kd0 = days | selectattr('pattern','eq',k) | list %}
+{%- set hh0 = kd0 | selectattr('holiday','defined') | map(attribute='holiday') | list %}
+{%- set nsl.m = nsl.m | combine({k: ((k ~ ' service') if k in ['weekday','weekend','saturday','sunday'] else (hh0[0] if hh0 else 'special service'))}) %}
+{%- endfor %}
+{%- set p_lbl = nsl.m %}
+
+<details>
+<summary><code><b>Service by date:</b> {{ day_first.day }}, {{ day_first.date }} → {{ day_last.day }}, {{ day_last.date }}</code></summary>
+{%- set ns = namespace(start=none, end=none, group_pattern=none, group_holiday=none) %}
+{%- for d in days %}
+{%- set h = d.get('holiday', '') %}
+{%- if ns.group_pattern != d.pattern or ns.group_holiday != h %}
+{%- if ns.group_pattern is not none %}
+<code>  {{ (ns.start ~ ' → ' ~ ns.end) | replace(' ', ' ') }}  {{ (p_lbl[ns.group_pattern] ~ ((' — ' ~ ns.group_holiday) if (ns.group_holiday and ns.group_holiday != p_lbl[ns.group_pattern]) else '')) | title | replace(' ', ' ') }}</code><br>
+{%- endif %}
+{%- set ns.start = d.date %}
+{%- set ns.group_pattern = d.pattern %}
+{%- set ns.group_holiday = h %}
+{%- endif %}
+{%- set ns.end = d.date %}
+{%- endfor %}
+<code>  {{ (ns.start ~ ' → ' ~ ns.end) | replace(' ', ' ') }}  {{ (p_lbl[ns.group_pattern] ~ ((' — ' ~ ns.group_holiday) if (ns.group_holiday and ns.group_holiday != p_lbl[ns.group_pattern]) else '')) | title | replace(' ', ' ') }}</code><br>
+</details>
+
+{%- set today_pat = day_first.pattern %}
+{%- set p_order = [today_pat] + (patterns.keys()|list|reject('eq', today_pat)|list) %}
+{% for p_key in p_order %}
+{%- set p = patterns[p_key] %}
+<br>
+<details>
+<summary><code>  <b>{{ p_lbl[p_key] | title }}</b> — {{ p.count }} trains{% if p_key == today_pat %} · in effect now{% endif %}</code></summary>
+
+{% for t in p.trains | sort(attribute='direction,departs') %}
+{%- if loop.changed(t.direction) %}
+<code>    <b><i>{{ t.direction|upper }}</i></b></code>
+{% endif %}
+<details>
+<summary><code>    {{ '%-5s'|format('#' ~ t.train) | replace(' ', ' ') }}  {{ t.departs }} → {{ t.arrives }}  {{ t.origin | replace(' ', ' ') }} → {{ t.destination | replace(' ', ' ') }}</code></summary>
+
+{%- for s in t.stations %}
+<code>         {{ '%-24s'|format(s.station) | replace(' ', ' ') }}{{ s.time }}</code><br>
+{%- endfor %}
+
+</details>
+{% endfor %}
+
+</details>
+{% endfor %}
+{% else %}
+_Schedule data not loaded for {{ line_ent }}._
+{% endif %}
+{% endmacro %}
