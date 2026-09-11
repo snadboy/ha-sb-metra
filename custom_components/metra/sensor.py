@@ -106,6 +106,18 @@ class TodayScheduleSensor(MetraBase):
                 "updated": self.coordinator.data["updated"]}
 
 
+def _slot_attrs(t: dict | None, updated: str) -> dict:
+    """Map-slot attributes; lat/lon present only while the slot holds a train."""
+    if not t:
+        return {"updated": updated}
+    return {"latitude": t["latitude"], "longitude": t["longitude"],
+            "heading_to": t["destination"], "next_station": t["next_station"],
+            "next_eta": t["eta"],
+            "dest_eta": (t["stops"][-1]["eta"] if t.get("stops") else "?"),
+            "stops": t.get("stops", []),
+            "updated": updated}
+
+
 class MapSlotSensor(MetraBase):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -130,15 +142,60 @@ class MapSlotSensor(MetraBase):
 
     @property
     def extra_state_attributes(self):
+        return _slot_attrs(self._train(), self.coordinator.data["updated"])
+
+
+class SelectedLineSlotSensor(MetraBase):
+    """Active train N on whichever line select.metra_line points at.
+
+    The per-line map slots pin a map to one line; these follow the selection,
+    so a single map card can show any line's live trains. Live positions only
+    exist for today, so the date select has no bearing on them.
+    """
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: MetraCoordinator, i: int) -> None:
+        super().__init__(coordinator)
+        self.i = i
+        self._attr_name = f"Active train {i}"
+        self._attr_unique_id = f"{DOMAIN}_network_active_train_{i}"
+        self._attr_device_info = NETWORK_DEVICE
+        self.entity_id = f"sensor.metra_active_train_{i}"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # re-render on a line change, not just on the 2-minute refresh
+        self.async_on_remove(self.coordinator.selection.subscribe(self.async_write_ha_state))
+
+    def _train(self):
+        line = self.coordinator.selection.line
+        if not line:
+            return None
+        live = [t for t in self.coordinator.data["active"].get(line, [])
+                if t.get("latitude") is not None]
+        live.sort(key=lambda t: t["direction"] != "inbound")   # stable: inbound first
+        return live[self.i - 1] if self.i <= len(live) else None
+
+    @property
+    def native_value(self):
+        t = self._train()
+        return t["train"] if t else "none"
+
+    @property
+    def entity_picture(self):
         t = self._train()
         if not t:
-            return {"updated": self.coordinator.data["updated"]}
-        return {"latitude": t["latitude"], "longitude": t["longitude"],
-                "heading_to": t["destination"], "next_station": t["next_station"],
-                "next_eta": t["eta"],
-                "dest_eta": (t["stops"][-1]["eta"] if t.get("stops") else "?"),
-                "stops": t.get("stops", []),
-                "updated": self.coordinator.data["updated"]}
+            return None
+        return f"/local/metra/engine_{slug(self.coordinator.selection.line)}_{t['direction']}.svg?v=2"
+
+    @property
+    def extra_state_attributes(self):
+        t = self._train()
+        attrs = _slot_attrs(t, self.coordinator.data["updated"])
+        attrs["line"] = self.coordinator.selection.line
+        if t:
+            attrs["direction"] = t["direction"]
+        return attrs
 
 
 FAV_KINDS = [
@@ -215,6 +272,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
         for direction in ("inbound", "outbound"):
             for i in range(1, coordinator.map_slots + 1):
                 entities.append(MapSlotSensor(coordinator, line, direction, i))
+    # both directions share one numbering here, so twice the per-direction cap
+    for i in range(1, 2 * coordinator.map_slots + 1):
+        entities.append(SelectedLineSlotSensor(coordinator, i))
     async_add_entities(entities)
 
     for sub in entry.subentries.values():
