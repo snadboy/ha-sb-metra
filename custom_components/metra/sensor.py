@@ -8,6 +8,7 @@ from __future__ import annotations
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -216,7 +217,8 @@ FAV_ENTITY_IDS = {
 
 class FavoriteSensor(MetraBase):
     def __init__(self, coordinator: MetraCoordinator, subentry_id: str, line: str,
-                 kind: str, label: str, data_key: str, is_next: bool) -> None:
+                 kind: str, label: str, data_key: str, is_next: bool,
+                 via_device_id: str | None) -> None:
         super().__init__(coordinator)
         self.subentry_id, self.line = subentry_id, line
         self.kind, self.data_key, self.is_next = kind, data_key, is_next
@@ -228,8 +230,9 @@ class FavoriteSensor(MetraBase):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"fav_{subentry_id}")},
             name=f"Metra {line} commute",
-            manufacturer="Metra GTFS-RT", model="Commute pair",
-            via_device=(DOMAIN, f"line_{slug(line)}"))
+            manufacturer="Metra GTFS-RT", model="Commute pair")
+        if via_device_id:
+            self._attr_device_info["via_device_id"] = via_device_id
         self.entity_id = f"sensor.metra_{slug(line)}_{FAV_ENTITY_IDS[kind]}"
 
     def _lst(self):
@@ -277,10 +280,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
         entities.append(SelectedLineSlotSensor(coordinator, i))
     async_add_entities(entities)
 
+    # via_device_id wants the parent's REGISTRY id (the (domain, identifier)
+    # via_device form is deprecated, removed in HA 2027.8). async_add_entities
+    # above only schedules registration, so the line device may not exist yet:
+    # get_or_create it on the MAIN entry -- never the subentry, which would
+    # hijack the shared line device. Unconfigured lines get no link, not an
+    # orphan device.
+    dev_reg = dr.async_get(hass)
+
+    def _line_device_id(line: str) -> str | None:
+        if line not in data["lines"]:
+            return None
+        return dev_reg.async_get_or_create(
+            config_entry_id=entry.entry_id, **_line_device(line, data["routes"])).id
+
     for sub in entry.subentries.values():
         if sub.subentry_type != "favorite":
             continue
+        via_id = _line_device_id(sub.data["line"])
         fav_entities = [FavoriteSensor(coordinator, sub.subentry_id, sub.data["line"],
-                                       kind, label, data_key, is_next)
+                                       kind, label, data_key, is_next, via_id)
                         for kind, label, data_key, is_next in FAV_KINDS]
         async_add_entities(fav_entities, config_subentry_id=sub.subentry_id)
