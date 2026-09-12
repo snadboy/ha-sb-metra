@@ -172,7 +172,7 @@ _No service data for {{ on_date }} — outside the published outlook ({{ b.first
 <details>
 <summary><code><b>Service by date:</b> {{ day_first }} → {{ day_last }}</code></summary>
 {%- for r in cal %}
-<code>  {{ (r.start ~ ' → ' ~ r.end) | replace(' ', ' ') }}  {{ (r.label ~ ((' — ' ~ r.holiday) if (r.holiday and r.holiday != r.label) else '')) | title | replace(' ', ' ') }}</code><br>
+<code>  {{ (r.start ~ ' → ' ~ r.end) | replace(' ', ' ') }}  {{ (r.label ~ ((' — ' ~ r.holiday) if (r.holiday and r.holiday != r.label) else '')) | title | replace(' ', ' ') }}</code><br>
 {%- endfor %}
 </details>
 {% endif %}
@@ -204,7 +204,7 @@ _Schedule data not loaded for {{ line_ent }}._
 {% endif %}
 {% endmacro %}
 
-{% macro timetable(line_ent, direction='inbound', pattern=none, limit=none) %}
+{% macro metra_timetable(line_ent, direction='inbound', pattern=none, limit=none) %}
 {%- set patterns = state_attr(line_ent,'patterns') or {} -%}
 {%- set pkey = metra_pattern_key(line_ent, pattern) | trim -%}
 {%- if not pkey or pkey not in patterns -%}
@@ -221,7 +221,7 @@ _No schedule data for {{ line_ent }}{{ (' pattern ' ~ pattern) if pattern else '
 {%- endif -%}
 {% endmacro %}
 
-{% macro stops_table(line_ent, train_no, pattern=none) %}
+{% macro metra_stops_table(line_ent, train_no, pattern=none) %}
 {%- set pkey = metra_pattern_key(line_ent, pattern) | trim -%}
 {%- set t = metra_stops_table_data(line_ent, train_no, pattern) | from_json -%}
 {%- if not t -%}
@@ -236,7 +236,7 @@ _Train #{{ train_no }} is not in the {{ (metra_service_label(line_ent, pkey) | t
 {%- endif -%}
 {% endmacro %}
 
-{% macro pattern_summary(line_ent) %}
+{% macro metra_pattern_summary(line_ent) %}
 {%- set rows = metra_pattern_summary_data(line_ent) | from_json -%}
 {%- if not rows -%}
 _No schedule data for {{ line_ent }}._
