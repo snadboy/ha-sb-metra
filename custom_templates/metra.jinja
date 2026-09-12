@@ -5,10 +5,10 @@
   homeassistant.reload_custom_templates after changing it.
 
   Usage in a markdown card:
-    {%- from 'metra.jinja' import service_browser -%}
-    {{- service_browser('sensor.metra_md_n_schedule') | safe -}}
+    {%- from 'metra.jinja' import metra_service_browser -%}
+    {{- metra_service_browser('sensor.metra_md_n_schedule') | safe -}}
 #}
-{% macro service_browser(line_ent, on_date=none) %}
+{% macro metra_service_browser(line_ent, on_date=none) %}
 {% set days = state_attr(line_ent,'days') or [] %}
 {% set patterns = state_attr(line_ent,'patterns') or {} %}
 {% set friendly = state_attr(line_ent, 'friendly_name') or '' %}
@@ -77,4 +77,226 @@ _No service data for {{ on_date }} — outside the published outlook ({{ day_fir
 {% else %}
 _Schedule data not loaded for {{ line_ent }}._
 {% endif %}
+{% endmacro %}
+
+{#
+  ---- Markdown table renderers ---------------------------------------------
+  Table views over the same schedule sensor metra_service_browser uses.
+
+  Usage in a markdown card:
+    {%- from 'metra.jinja' import timetable, stops_table, metra_service_calendar, pattern_summary -%}
+    {{- timetable('sensor.metra_up_w_schedule', 'inbound', limit=10) | safe -}}
+
+  pattern defaults to today's pattern; pass a patterns key ('weekday',
+  'saturday', a holiday key, ...) to pin a specific service day.
+#}
+{% macro metra_service_label(line_ent, pkey) %}
+{%- set days = state_attr(line_ent,'days') or [] -%}
+{%- if pkey in ['weekday','weekend','saturday','sunday'] -%}
+{{- pkey ~ ' service' -}}
+{%- else -%}
+{%- set hh = days | selectattr('pattern','eq',pkey) | selectattr('holiday','defined') | map(attribute='holiday') | list -%}
+{{- hh[0] if hh else 'special service' -}}
+{%- endif -%}
+{% endmacro %}
+
+{% macro timetable(line_ent, direction='inbound', pattern=none, limit=none) %}
+{%- set days = state_attr(line_ent,'days') or [] -%}
+{%- set patterns = state_attr(line_ent,'patterns') or {} -%}
+{%- set pkey = pattern if pattern else (days[0].pattern if days else none) -%}
+{%- if pkey is none or pkey not in patterns -%}
+_No schedule data for {{ line_ent }}{{ (' pattern ' ~ pattern) if pattern else '' }}._
+{%- else -%}
+{%- set trains = patterns[pkey].trains | selectattr('direction','eq',direction) | sort(attribute='departs') | list -%}
+{%- set shown = trains[:limit | int] if limit else trains -%}
+**{{ state_attr(line_ent,'friendly_name') | replace(' Schedule','') }}** · {{ metra_service_label(line_ent, pkey) | trim | title }} · {{ direction }} — {{ trains | count }} trains{% if limit and (trains | count) > (shown | count) %}, first {{ shown | count }}{% endif %}
+
+| Train | Depart | Arrive | From | To | Stops |
+|:--|--:|--:|:--|:--|--:|
+{% for t in shown %}| #{{ t.train }} | {{ t.departs }} | {{ t.arrives }} | {{ t.origin }} | {{ t.destination }} | {{ t.stations | count }} |
+{% endfor %}
+{%- endif -%}
+{% endmacro %}
+
+{% macro stops_table(line_ent, train_no, pattern=none) %}
+{%- set days = state_attr(line_ent,'days') or [] -%}
+{%- set patterns = state_attr(line_ent,'patterns') or {} -%}
+{%- set pkey = pattern if pattern else (days[0].pattern if days else none) -%}
+{%- set trains = patterns[pkey].trains if pkey in patterns else [] -%}
+{%- set matches = trains | selectattr('train','eq', train_no | string) | list -%}
+{%- if not matches -%}
+_Train #{{ train_no }} is not in the {{ (metra_service_label(line_ent, pkey) | trim) if pkey else 'current' }} schedule._
+{%- else -%}
+{%- set t = matches[0] -%}
+**#{{ t.train }}** · {{ t.direction }} · {{ t.origin }} {{ t.departs }} → {{ t.destination }} {{ t.arrives }}
+
+| # | Station | Time |
+|--:|:--|--:|
+{% for s in t.stations %}| {{ loop.index }} | {{ s.station }} | {{ s.time }} |
+{% endfor %}
+{%- endif -%}
+{% endmacro %}
+
+{% macro pattern_summary(line_ent) %}
+{%- set patterns = state_attr(line_ent,'patterns') or {} -%}
+{%- set days = state_attr(line_ent,'days') or [] -%}
+{%- set today = days[0].pattern if days else none -%}
+{%- if not patterns -%}
+_No schedule data for {{ line_ent }}._
+{%- else -%}
+| Service | Trains | In | Out | First | Last |
+|:--|--:|--:|--:|--:|--:|
+{% for k, p in patterns.items() %}{% set deps = p.trains | map(attribute='departs') | sort | list %}| {{ metra_service_label(line_ent, k) | trim | title }}{% if k == today %} (today){% endif %} | {{ p.count }} | {{ p.trains | selectattr('direction','eq','inbound') | list | count }} | {{ p.trains | selectattr('direction','eq','outbound') | list | count }} | {{ deps | first }} | {{ deps | last }} |
+{% endfor %}
+{%- endif -%}
+{% endmacro %}
+
+{% macro metra_service_calendar(line_ent) %}
+{%- set days = state_attr(line_ent,'days') or [] -%}
+{%- if not days -%}
+_No service outlook for {{ line_ent }}._
+{%- else -%}
+{%- set ns = namespace(start=none, end=none, sday=none, eday=none, pat=none, hol=none, rows=[]) -%}
+{%- for d in days -%}
+{%- set h = d.get('holiday','') -%}
+{%- if ns.pat != d.pattern or ns.hol != h -%}
+{%- if ns.pat is not none -%}
+{%- set ns.rows = ns.rows + [[ns.start, ns.end, ns.sday, ns.eday, ns.pat, ns.hol]] -%}
+{%- endif -%}
+{%- set ns.start = d.date -%}
+{%- set ns.sday = d.day -%}
+{%- set ns.pat = d.pattern -%}
+{%- set ns.hol = h -%}
+{%- endif -%}
+{%- set ns.end = d.date -%}
+{%- set ns.eday = d.day -%}
+{%- endfor -%}
+{%- set ns.rows = ns.rows + [[ns.start, ns.end, ns.sday, ns.eday, ns.pat, ns.hol]] -%}
+**{{ state_attr(line_ent,'friendly_name') | replace(' Schedule','') }}** · {{ days[0].date }} → {{ days[days | count - 1].date }}
+
+| Dates | Days | Service |
+|:--|:--|:--|
+{% for r in ns.rows %}{% set lbl = metra_service_label(line_ent, r[4]) | trim | title %}| {{ r[0] }}{% if r[1] != r[0] %} → {{ r[1] }}{% endif %} | {{ r[2][:3] }}{% if r[1] != r[0] %}–{{ r[3][:3] }}{% endif %} | {{ lbl }}{% if r[5] and (r[5] | title) != lbl %} — {{ r[5] }}{% endif %} |
+{% endfor %}
+{%- endif -%}
+{% endmacro %}
+
+{#
+  ---- Data renderers -------------------------------------------------------
+  Jinja macros can only return strings, so each macro below emits JSON.
+  Pipe it through from_json to get a real list/dict you can iterate, filter,
+  sort or hand to another card.
+
+    {%- from 'metra.jinja' import metra_timetable_data -%}
+    {%- set trains = metra_timetable_data('sensor.metra_up_w_schedule', 'inbound') | from_json -%}
+    {{ trains | map(attribute='train') | list | join(', ') }}
+
+  Each *_data macro mirrors the table macro of the same name. They never
+  render an error string -- an unknown line, pattern or train yields an
+  empty list (or null for the single-train macro), so callers can test with
+  a plain `if`.
+#}
+{% macro metra_pattern_summary_data(line_ent) %}
+{%- set patterns = state_attr(line_ent,'patterns') or {} -%}
+{%- set days = state_attr(line_ent,'days') or [] -%}
+{%- set today = days[0].pattern if days else none -%}
+{%- set ns = namespace(rows=[]) -%}
+{%- for k, p in patterns.items() -%}
+{%- set deps = p.trains | map(attribute='departs') | sort | list -%}
+{%- set ns.rows = ns.rows + [{
+      'key': k,
+      'label': metra_service_label(line_ent, k) | trim,
+      'today': k == today,
+      'count': p.count,
+      'inbound': p.trains | selectattr('direction','eq','inbound') | list | count,
+      'outbound': p.trains | selectattr('direction','eq','outbound') | list | count,
+      'first': deps | first,
+      'last': deps | last }] -%}
+{%- endfor -%}
+{{- ns.rows | to_json -}}
+{% endmacro %}
+
+{% macro metra_timetable_data(line_ent, direction=none, pattern=none, limit=none) %}
+{%- set days = state_attr(line_ent,'days') or [] -%}
+{%- set patterns = state_attr(line_ent,'patterns') or {} -%}
+{%- set pkey = pattern if pattern else (days[0].pattern if days else none) -%}
+{%- if pkey is none or pkey not in patterns -%}
+{{- [] | to_json -}}
+{%- else -%}
+{%- set all = patterns[pkey].trains | sort(attribute='departs') | list -%}
+{%- set picked = (all | selectattr('direction','eq',direction) | list) if direction else all -%}
+{{- (picked[:limit | int] if limit else picked) | to_json -}}
+{%- endif -%}
+{% endmacro %}
+
+{% macro metra_stops_table_data(line_ent, train_no, pattern=none) %}
+{%- set days = state_attr(line_ent,'days') or [] -%}
+{%- set patterns = state_attr(line_ent,'patterns') or {} -%}
+{%- set pkey = pattern if pattern else (days[0].pattern if days else none) -%}
+{%- set trains = patterns[pkey].trains if pkey in patterns else [] -%}
+{%- set matches = trains | selectattr('train','eq', train_no | string) | list -%}
+{{- (matches[0] if matches else none) | to_json -}}
+{% endmacro %}
+
+{% macro metra_service_calendar_data(line_ent) %}
+{%- set days = state_attr(line_ent,'days') or [] -%}
+{%- if not days -%}
+{{- [] | to_json -}}
+{%- else -%}
+{%- set ns = namespace(start=none, end=none, sday=none, eday=none, pat=none, hol=none, rows=[]) -%}
+{%- for d in days -%}
+{%- set h = d.get('holiday','') -%}
+{%- if ns.pat != d.pattern or ns.hol != h -%}
+{%- if ns.pat is not none -%}
+{%- set ns.rows = ns.rows + [{'start': ns.start, 'end': ns.end, 'start_day': ns.sday,
+      'end_day': ns.eday, 'pattern': ns.pat,
+      'label': metra_service_label(line_ent, ns.pat) | trim,
+      'holiday': ns.hol or none}] -%}
+{%- endif -%}
+{%- set ns.start = d.date -%}
+{%- set ns.sday = d.day -%}
+{%- set ns.pat = d.pattern -%}
+{%- set ns.hol = h -%}
+{%- endif -%}
+{%- set ns.end = d.date -%}
+{%- set ns.eday = d.day -%}
+{%- endfor -%}
+{{- (ns.rows + [{'start': ns.start, 'end': ns.end, 'start_day': ns.sday,
+      'end_day': ns.eday, 'pattern': ns.pat,
+      'label': metra_service_label(line_ent, ns.pat) | trim,
+      'holiday': ns.hol or none}]) | to_json -}}
+{%- endif -%}
+{% endmacro %}
+
+{% macro metra_service_browser_data(line_ent, on_date=none) %}
+{%- set days = state_attr(line_ent,'days') or [] -%}
+{%- set patterns = state_attr(line_ent,'patterns') or {} -%}
+{%- if not days -%}
+{{- {'entity': line_ent, 'line': none, 'loaded': false, 'calendar': [], 'patterns': []} | to_json -}}
+{%- else -%}
+{%- set sel_list = (days | selectattr('date','eq', on_date|string) | list) if on_date else [] -%}
+{%- set sel_day = sel_list[0] if sel_list else none -%}
+{%- set today_pat = days[0].pattern -%}
+{%- set p_order = [sel_day.pattern] if sel_day
+      else ([today_pat] + (patterns.keys()|list|reject('eq', today_pat)|list)) -%}
+{%- set ns = namespace(pats=[]) -%}
+{%- for k in p_order -%}
+{%- set ns.pats = ns.pats + [{
+      'key': k,
+      'label': metra_service_label(line_ent, k) | trim,
+      'in_effect': (k == today_pat) and not sel_day,
+      'count': patterns[k].count,
+      'trains': patterns[k].trains | sort(attribute='direction,departs') | list }] -%}
+{%- endfor -%}
+{{- {'entity': line_ent,
+     'line': state_attr(line_ent,'friendly_name') | replace(' Schedule',''),
+     'loaded': true,
+     'first': days[0].date,
+     'last': days[days|count - 1].date,
+     'requested_date': on_date,
+     'in_outlook': (on_date is none) or (sel_day is not none),
+     'selected': sel_day,
+     'calendar': metra_service_calendar_data(line_ent) | from_json,
+     'patterns': ns.pats} | to_json -}}
+{%- endif -%}
 {% endmacro %}
