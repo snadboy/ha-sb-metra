@@ -5,16 +5,21 @@ dashboards, the delay-push automation, and the customize-free map keep working.
 """
 from __future__ import annotations
 
+from datetime import date as date_cls, datetime
+
+import voluptuous as vol
+
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.core import HomeAssistant, SupportsResponse
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_platform
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import MetraCoordinator
+from . import MetraCoordinator, gtfs
 from .const import DOMAIN
 from .gtfs import slug
 
@@ -35,6 +40,59 @@ class MetraBase(CoordinatorEntity, SensorEntity):
 
     def __init__(self, coordinator: MetraCoordinator) -> None:
         super().__init__(coordinator)
+
+    # ---- entity-bound query actions --------------------------------------
+    # HA registers entity services against the whole PLATFORM, not a class, so
+    # every metra sensor inherits these. Entities that carry a line answer;
+    # the rest reject the call naming the entity to target instead.
+
+    def _svc_line(self) -> str:
+        line = getattr(self, "line", None)
+        if not line:
+            raise ServiceValidationError(
+                f"{self.entity_id} is not tied to a line — target that line's "
+                "Schedule sensor instead, e.g. sensor.metra_up_w_schedule")
+        return line
+
+    async def _svc_idx(self) -> dict:
+        return self.coordinator.idx or await self.hass.async_add_executor_job(gtfs.load_index)
+
+    async def _svc_rt(self):
+        return await self.hass.async_add_executor_job(gtfs.realtime, self.coordinator.token)
+
+    async def _svc_run(self, fn, *args):
+        try:
+            return await self.hass.async_add_executor_job(fn, *args)
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+
+    @staticmethod
+    def _svc_day(value) -> date_cls:
+        return date_cls.fromisoformat(str(value)) if value else datetime.now(gtfs.TZ).date()
+
+    async def async_svc_schedule(self, date=None) -> dict:
+        line = self._svc_line()
+        return await self._svc_run(gtfs.schedule_day, await self._svc_idx(), line,
+                                   self._svc_day(date))
+
+    async def async_svc_arrivals(self, station: str, n: int = 5) -> dict:
+        line = self._svc_line()
+        idx = await self._svc_idx()
+        rt, _pos = await self._svc_rt()
+        return await self._svc_run(gtfs.arrivals, idx, line, station, rt, int(n))
+
+    async def async_svc_query(self, origin: str, destination: str, n: int = 3) -> dict:
+        line = self._svc_line()
+        idx = await self._svc_idx()
+        rt, _pos = await self._svc_rt()
+        return await self._svc_run(gtfs.query_pair, idx, line, origin, destination, rt, int(n))
+
+    async def async_svc_train(self, train: str, date=None) -> dict:
+        line = self._svc_line()
+        idx = await self._svc_idx()
+        rt, pos = await self._svc_rt()
+        return await self._svc_run(gtfs.train_details, idx, line, str(train),
+                                   self._svc_day(date), rt, pos)
 
 
 class RosterSensor(MetraBase):
@@ -267,6 +325,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
                             async_add_entities: AddEntitiesCallback) -> None:
     coordinator: MetraCoordinator = hass.data[DOMAIN][entry.entry_id]
     data = coordinator.data
+
+    # the line is the TARGET, not a string field -- no line validation needed,
+    # and a multi-entity target returns one response per entity_id
+    platform = entity_platform.async_get_current_platform()
+    platform.async_register_entity_service(
+        "schedule", {vol.Optional("date"): cv.string},
+        "async_svc_schedule", supports_response=SupportsResponse.ONLY)
+    platform.async_register_entity_service(
+        "arrivals", {vol.Required("station"): cv.string,
+                     vol.Optional("n", default=5): vol.Coerce(int)},
+        "async_svc_arrivals", supports_response=SupportsResponse.ONLY)
+    platform.async_register_entity_service(
+        "query", {vol.Required("origin"): cv.string, vol.Required("destination"): cv.string,
+                  vol.Optional("n", default=3): vol.Coerce(int)},
+        "async_svc_query", supports_response=SupportsResponse.ONLY)
+    platform.async_register_entity_service(
+        "train", {vol.Required("train"): cv.string, vol.Optional("date"): cv.string},
+        "async_svc_train", supports_response=SupportsResponse.ONLY)
+
     entities: list[SensorEntity] = [RosterSensor(coordinator)]
     for line in data["lines"]:
         entities.append(ActiveTrainsSensor(coordinator, line))

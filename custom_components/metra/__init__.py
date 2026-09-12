@@ -8,11 +8,8 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime, timedelta
 
-import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from . import gtfs
@@ -173,7 +170,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_reload_on_change))
-    _register_services(hass, coordinator)
     return True
 
 
@@ -191,63 +187,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
     return ok
-
-
-def _register_services(hass: HomeAssistant, coordinator: MetraCoordinator) -> None:
-    if hass.services.has_service(DOMAIN, "schedule"):
-        return
-
-    def _date(call: ServiceCall) -> date:
-        raw = call.data.get("date")
-        return date.fromisoformat(str(raw)) if raw else datetime.now(gtfs.TZ).date()
-
-    async def _run(fn, *args):
-        try:
-            return await hass.async_add_executor_job(fn, *args)
-        except ValueError as err:
-            raise HomeAssistantError(str(err)) from err
-
-    async def svc_schedule(call: ServiceCall) -> dict:
-        idx = coordinator.idx or await hass.async_add_executor_job(gtfs.load_index)
-        gtfs.check_line(idx, call.data["line"])
-        return await _run(gtfs.schedule_day, idx, call.data["line"], _date(call))
-
-    async def svc_arrivals(call: ServiceCall) -> dict:
-        idx = coordinator.idx or await hass.async_add_executor_job(gtfs.load_index)
-        gtfs.check_line(idx, call.data["line"])
-        rt, _pos = await hass.async_add_executor_job(gtfs.realtime, coordinator.token)
-        return await _run(gtfs.arrivals, idx, call.data["line"], call.data["station"],
-                          rt, int(call.data.get("n", 5)))
-
-    async def svc_query(call: ServiceCall) -> dict:
-        idx = coordinator.idx or await hass.async_add_executor_job(gtfs.load_index)
-        gtfs.check_line(idx, call.data["line"])
-        rt, _pos = await hass.async_add_executor_job(gtfs.realtime, coordinator.token)
-        return await _run(gtfs.query_pair, idx, call.data["line"], call.data["origin"],
-                          call.data["destination"], rt, int(call.data.get("n", 3)))
-
-    async def svc_train(call: ServiceCall) -> dict:
-        idx = coordinator.idx or await hass.async_add_executor_job(gtfs.load_index)
-        gtfs.check_line(idx, call.data["line"])
-        rt, pos = await hass.async_add_executor_job(gtfs.realtime, coordinator.token)
-        return await _run(gtfs.train_details, idx, call.data["line"],
-                          str(call.data["train"]), _date(call), rt, pos)
-
-    line_schema = {vol.Required("line"): str}
-    hass.services.async_register(
-        DOMAIN, "schedule", svc_schedule,
-        schema=vol.Schema({**line_schema, vol.Optional("date"): str}),
-        supports_response=SupportsResponse.ONLY)
-    hass.services.async_register(
-        DOMAIN, "arrivals", svc_arrivals,
-        schema=vol.Schema({**line_schema, vol.Required("station"): str, vol.Optional("n"): vol.Coerce(int)}),
-        supports_response=SupportsResponse.ONLY)
-    hass.services.async_register(
-        DOMAIN, "query", svc_query,
-        schema=vol.Schema({**line_schema, vol.Required("origin"): str,
-                           vol.Required("destination"): str, vol.Optional("n"): vol.Coerce(int)}),
-        supports_response=SupportsResponse.ONLY)
-    hass.services.async_register(
-        DOMAIN, "train", svc_train,
-        schema=vol.Schema({**line_schema, vol.Required("train"): vol.Coerce(str), vol.Optional("date"): str}),
-        supports_response=SupportsResponse.ONLY)
