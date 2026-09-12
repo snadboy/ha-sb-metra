@@ -8,7 +8,7 @@
     {%- from 'metra.jinja' import service_browser -%}
     {{- service_browser('sensor.metra_md_n_schedule') | safe -}}
 #}
-{% macro service_browser(line_ent) %}
+{% macro service_browser(line_ent, on_date=none) %}
 {% set days = state_attr(line_ent,'days') or [] %}
 {% set patterns = state_attr(line_ent,'patterns') or {} %}
 {% set friendly = state_attr(line_ent, 'friendly_name') or '' %}
@@ -16,6 +16,11 @@
 {% if days %}
 {% set day_first = days[0] %}
 {% set day_last = days[days|count - 1] %}
+{%- set sel_list = (days | selectattr('date','eq', on_date|string) | list) if on_date else [] %}
+{%- set sel_day = sel_list[0] if sel_list else none %}
+{% if on_date and not sel_day %}
+_No service data for {{ on_date }} — outside the published outlook ({{ day_first.date }} → {{ day_last.date }})._
+{% else %}
 {%- set nsl = namespace(m={}) %}
 {%- for k in patterns.keys() %}
 {%- set kd0 = days | selectattr('pattern','eq',k) | list %}
@@ -24,6 +29,7 @@
 {%- endfor %}
 {%- set p_lbl = nsl.m %}
 
+{% if not sel_day %}
 <details>
 <summary><code><b>Service by date:</b> {{ day_first.day }}, {{ day_first.date }} → {{ day_last.day }}, {{ day_last.date }}</code></summary>
 {%- set ns = namespace(start=none, end=none, group_pattern=none, group_holiday=none) %}
@@ -41,14 +47,15 @@
 {%- endfor %}
 <code>  {{ (ns.start ~ ' → ' ~ ns.end) | replace(' ', ' ') }}  {{ (p_lbl[ns.group_pattern] ~ ((' — ' ~ ns.group_holiday) if (ns.group_holiday and ns.group_holiday != p_lbl[ns.group_pattern]) else '')) | title | replace(' ', ' ') }}</code><br>
 </details>
+{% endif %}
 
 {%- set today_pat = day_first.pattern %}
-{%- set p_order = [today_pat] + (patterns.keys()|list|reject('eq', today_pat)|list) %}
+{%- set p_order = [sel_day.pattern] if sel_day else ([today_pat] + (patterns.keys()|list|reject('eq', today_pat)|list)) %}
 {% for p_key in p_order %}
 {%- set p = patterns[p_key] %}
 <br>
 <details>
-<summary><code>  <b>{{ p_lbl[p_key] | title }}</b> — {{ p.count }} trains{% if p_key == today_pat %} · in effect now{% endif %}</code></summary>
+<summary><code>  <b>{% if sel_day %}{{ sel_day.day[:3] }}, {{ sel_day.date | replace('-','.') }} · {% endif %}{{ p_lbl[p_key] | title }}</b> — {{ p.count }} trains{% if not sel_day and p_key == today_pat %} · in effect now{% endif %}{% if sel_day and sel_day.holiday is defined %} · {{ sel_day.holiday }}{% endif %}</code></summary>
 
 {% for t in p.trains | sort(attribute='direction,departs') %}
 {%- if loop.changed(t.direction) %}
@@ -66,6 +73,7 @@
 
 </details>
 {% endfor %}
+{% endif %}
 {% else %}
 _Schedule data not loaded for {{ line_ent }}._
 {% endif %}
