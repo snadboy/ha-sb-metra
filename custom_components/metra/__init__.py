@@ -6,7 +6,7 @@ are kept identical to the publisher era so dashboards/automations survive.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -30,7 +30,6 @@ class MetraSelection:
 
     def __init__(self) -> None:
         self.line: str | None = None
-        self.date: str | None = None
         self._listeners: list = []
 
     def subscribe(self, cb) -> callable:
@@ -48,12 +47,6 @@ class MetraSelection:
         self.line = line
         self._notify()
 
-    def set_date(self, iso: str | None) -> None:
-        if iso == self.date:
-            return
-        self.date = iso
-        self._notify()
-
     def _notify(self) -> None:
         for cb in list(self._listeners):
             cb()
@@ -68,32 +61,7 @@ class MetraCoordinator(DataUpdateCoordinator):
         self.token: str = entry.data["api_token"]
         self.idx: dict | None = None
         self._span_cache: dict = {}
-        self._stops_cache: dict = {}
-        self._day_cache: dict = {}
         self.selection = MetraSelection()
-
-    def stops(self, line: str) -> list[str]:
-        """Route-ordered stop names for a line; recomputed only on feed change."""
-        if not self.idx:
-            return []
-        key = (self.idx["version"], line)
-        if key not in self._stops_cache:
-            self._stops_cache = {key: gtfs.line_stops(self.idx, line)}
-        return self._stops_cache[key]
-
-    def day_trains(self, line: str, iso: str) -> list[dict]:
-        """Scheduled trains for one line on one date; single-entry cache.
-
-        The coordinator only carries today; the console can ask for any date
-        inside the feed horizon, so this computes on demand.
-        """
-        if not self.idx or not line or not iso:
-            return []
-        key = (self.idx["version"], line, iso)
-        if key not in self._day_cache:
-            sched = gtfs.schedule_day(self.idx, line, date.fromisoformat(iso))
-            self._day_cache = {key: sched["trains"]}
-        return self._day_cache[key]
 
     def _lines(self) -> list[str]:
         opts = self.entry.options.get("lines")
