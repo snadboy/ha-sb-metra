@@ -1,10 +1,11 @@
-"""Metra sensors: roster, per-line active/schedule, map slots, favorite pairs.
+"""Metra sensors: per-line active/schedule, map slots, favorite pairs.
 
 Entity ids are pinned to the MQTT-publisher-era ids (set explicitly) so
 dashboards, the delay-push automation, and the customize-free map keep working.
 """
 from __future__ import annotations
 
+import logging
 from datetime import date as date_cls, datetime
 
 import voluptuous as vol
@@ -13,7 +14,8 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_platform
+from homeassistant.helpers import (config_validation as cv, device_registry as dr,
+                                   entity_platform, entity_registry as er)
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -22,6 +24,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import MetraCoordinator, gtfs
 from .const import DOMAIN
 from .gtfs import slug
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _line_device(line: str, routes: list[dict]) -> DeviceInfo:
@@ -95,25 +99,6 @@ class MetraBase(CoordinatorEntity, SensorEntity):
                                    self._svc_day(date), rt, pos)
 
 
-class RosterSensor(MetraBase):
-    _attr_name = "Lines"
-
-    def __init__(self, coordinator: MetraCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{DOMAIN}_network_lines"
-        self._attr_device_info = NETWORK_DEVICE
-        self.entity_id = "sensor.metra_network_lines"
-
-    @property
-    def native_value(self):
-        return len(self.coordinator.data["routes"])
-
-    @property
-    def extra_state_attributes(self):
-        return {"lines": self.coordinator.data["routes"],
-                "updated": self.coordinator.data["updated"]}
-
-
 class ActiveTrainsSensor(MetraBase):
     _attr_name = "Active trains"
 
@@ -160,8 +145,7 @@ class TodayScheduleSensor(MetraBase):
     @property
     def extra_state_attributes(self):
         sched = self.coordinator.data["schedule"].get(self.line, {})
-        return {"date": sched.get("date"), "trains": sched.get("trains", []),
-                "days": sched.get("days", []), "patterns": sched.get("patterns", {}),
+        return {"days": sched.get("days", []), "patterns": sched.get("patterns", {}),
                 "updated": self.coordinator.data["updated"]}
 
 
@@ -344,7 +328,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
         "train", {vol.Required("train"): cv.string, vol.Optional("date"): cv.string},
         "async_svc_train", supports_response=SupportsResponse.ONLY)
 
-    entities: list[SensorEntity] = [RosterSensor(coordinator)]
+    entities: list[SensorEntity] = []
     for line in data["lines"]:
         entities.append(ActiveTrainsSensor(coordinator, line))
         entities.append(TodayScheduleSensor(coordinator, line))
@@ -356,6 +340,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
     for i in range(1, 2 * coordinator.map_slots + 1):
         entities.append(SelectedLineSlotSensor(coordinator, i))
     async_add_entities(entities)
+
+    # Drop registry rows for sensors this entry no longer provides: a line
+    # taken out of `lines`/`map_lines`, a lower `map_slots`, a retired sensor
+    # class. Without this they linger as restored "unavailable" entities.
+    # Favorite sensors belong to subentries and are never touched.
+    ent_reg = er.async_get(hass)
+    wanted = {e.unique_id for e in entities}
+    stale = [r.entity_id for r in er.async_entries_for_config_entry(ent_reg, entry.entry_id)
+             if r.domain == "sensor" and r.config_subentry_id is None
+             and not r.unique_id.startswith(f"{DOMAIN}_fav_")
+             and r.unique_id not in wanted]
+    for entity_id in stale:
+        ent_reg.async_remove(entity_id)
+    if stale:
+        _LOGGER.info("removed %d stale metra sensor(s): %s", len(stale), ", ".join(stale[:10]))
 
     # via_device_id wants the parent's REGISTRY id (the (domain, identifier)
     # via_device form is deprecated, removed in HA 2027.8). async_add_entities

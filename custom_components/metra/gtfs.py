@@ -290,12 +290,6 @@ def line_stops(idx: dict, line: str) -> list[str]:
     return out_names
 
 
-def check_line(idx: dict, line: str) -> None:
-    if line not in {r["id"] for r in idx["routes"]}:
-        raise ValueError(f"unknown line {line}; lines: "
-                         + ", ".join(r["id"] for r in idx["routes"]))
-
-
 def upcoming(idx, line, origin, dest, rt_line, now, n=N_UPCOMING):
     names = idx["names"]
     out = []

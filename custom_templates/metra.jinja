@@ -13,25 +13,40 @@
 
   Usage in a markdown card:
     {%- from 'metra.jinja' import metra_service_browser -%}
-    {{- metra_service_browser('sensor.metra_md_n_schedule') | safe -}}
+    {{- metra_service_browser('MD-N') | safe -}}
 
   Data form -- pipe through from_json for a real list/dict:
     {%- from 'metra.jinja' import metra_timetable_data -%}
-    {%- set trains = metra_timetable_data('sensor.metra_up_w_schedule','inbound') | from_json -%}
+    {%- set trains = metra_timetable_data('UP-W', 'inbound') | from_json -%}
     {{ trains | map(attribute='train') | list | join(', ') }}
 
   An unknown line, pattern or train yields [] (or null for the single-train
   macro), so callers can test the result with a plain if.
+
+  LINE ARGUMENT: every schedule macro takes a line NAME ('UP-W') or, as
+  before, that line's schedule sensor id -- metra_entity() maps one to the
+  other with the integration's own slug rule, so no card builds entity ids.
+  metra_active_trains[_data] take a name, a list of names, or none for
+  every configured line, and return trains from all of them in one list.
 #}
 
 {# ---- helpers ------------------------------------------------------------ #}
 
+{# 'UP-W' -> sensor.metra_up_w_<kind>; anything already an entity id passes
+   through. Mirrors gtfs.slug() in the integration -- keep the two in step. #}
+{% macro metra_entity(line, kind='schedule') %}
+{%- set line = line or '' -%}
+{{- line if '.' in line else 'sensor.metra_' ~ (line | lower | regex_replace('[^a-z0-9]+', '_')).strip('_') ~ '_' ~ kind -}}
+{% endmacro %}
+
 {% macro metra_pattern_key(line_ent, pattern=none) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set days = state_attr(line_ent,'days') or [] -%}
 {{- pattern if pattern else (days[0].pattern if days else '') -}}
 {% endmacro %}
 
 {% macro metra_service_label(line_ent, pkey) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set days = state_attr(line_ent,'days') or [] -%}
 {%- if pkey in ['weekday','weekend','saturday','sunday'] -%}
 {{- pkey ~ ' service' -}}
@@ -44,6 +59,7 @@
 {# ---- data: the single source of truth ----------------------------------- #}
 
 {% macro metra_pattern_summary_data(line_ent) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set patterns = state_attr(line_ent,'patterns') or {} -%}
 {%- set days = state_attr(line_ent,'days') or [] -%}
 {%- set today = days[0].pattern if days else none -%}
@@ -64,6 +80,7 @@
 {% endmacro %}
 
 {% macro metra_timetable_data(line_ent, direction=none, pattern=none, limit=none) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set patterns = state_attr(line_ent,'patterns') or {} -%}
 {%- set pkey = metra_pattern_key(line_ent, pattern) | trim -%}
 {%- if not pkey or pkey not in patterns -%}
@@ -76,6 +93,7 @@
 {% endmacro %}
 
 {% macro metra_stops_table_data(line_ent, train_no, pattern=none) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set patterns = state_attr(line_ent,'patterns') or {} -%}
 {%- set pkey = metra_pattern_key(line_ent, pattern) | trim -%}
 {%- set trains = patterns[pkey].trains if pkey in patterns else [] -%}
@@ -84,6 +102,7 @@
 {% endmacro %}
 
 {% macro metra_service_calendar_data(line_ent) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set days = state_attr(line_ent,'days') or [] -%}
 {%- if not days -%}
 {{- [] | to_json -}}
@@ -114,6 +133,7 @@
 {% endmacro %}
 
 {% macro metra_service_browser_data(line_ent, on_date=none) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set days = state_attr(line_ent,'days') or [] -%}
 {%- set patterns = state_attr(line_ent,'patterns') or {} -%}
 {%- set friendly = state_attr(line_ent,'friendly_name') or '' -%}
@@ -150,6 +170,22 @@
      'calendar': metra_service_calendar_data(line_ent) | from_json,
      'patterns': ns.pats} | to_json -}}
 {%- endif -%}
+{% endmacro %}
+
+{# Live trains for one or more lines. lines = 'UP-W', ['UP-W','UP-NW'], or none
+   for every configured line. Trains are grouped by line in request order,
+   inbound first, then by ETA; each gains `line` and `terminal_eta`. #}
+{% macro metra_active_trains_data(lines=none) %}
+{%- set wanted = (state_attr('select.metra_line', 'options') or []) if lines is none else ([lines] if lines is string else lines) -%}
+{%- set ns = namespace(trains=[], updated=none) -%}
+{%- for line in wanted -%}
+{%- set ent = metra_entity(line, 'active_trains') | trim -%}
+{%- set ns.updated = ns.updated or state_attr(ent, 'updated') -%}
+{%- for t in (state_attr(ent, 'trains') or []) | sort(attribute='direction,eta') -%}
+{%- set ns.trains = ns.trains + [dict(t, line=line, terminal_eta=((t.stops | last).eta if t.stops else none))] -%}
+{%- endfor -%}
+{%- endfor -%}
+{{- {'lines': wanted | list, 'updated': ns.updated, 'trains': ns.trains} | to_json -}}
 {% endmacro %}
 
 {# ---- renderers: formatting only ----------------------------------------- #}
@@ -205,6 +241,7 @@ _Schedule data not loaded for {{ line_ent }}._
 {% endmacro %}
 
 {% macro metra_timetable(line_ent, direction='inbound', pattern=none, limit=none) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set patterns = state_attr(line_ent,'patterns') or {} -%}
 {%- set pkey = metra_pattern_key(line_ent, pattern) | trim -%}
 {%- if not pkey or pkey not in patterns -%}
@@ -222,6 +259,7 @@ _No schedule data for {{ line_ent }}{{ (' pattern ' ~ pattern) if pattern else '
 {% endmacro %}
 
 {% macro metra_stops_table(line_ent, train_no, pattern=none) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set pkey = metra_pattern_key(line_ent, pattern) | trim -%}
 {%- set t = metra_stops_table_data(line_ent, train_no, pattern) | from_json -%}
 {%- if not t -%}
@@ -237,6 +275,7 @@ _Train #{{ train_no }} is not in the {{ (metra_service_label(line_ent, pkey) | t
 {% endmacro %}
 
 {% macro metra_pattern_summary(line_ent) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set rows = metra_pattern_summary_data(line_ent) | from_json -%}
 {%- if not rows -%}
 _No schedule data for {{ line_ent }}._
@@ -249,6 +288,7 @@ _No schedule data for {{ line_ent }}._
 {% endmacro %}
 
 {% macro metra_service_calendar(line_ent) %}
+{%- set line_ent = metra_entity(line_ent) | trim -%}
 {%- set rows = metra_service_calendar_data(line_ent) | from_json -%}
 {%- if not rows -%}
 _No service outlook for {{ line_ent }}._
@@ -259,5 +299,25 @@ _No service outlook for {{ line_ent }}._
 |:--|:--|:--|
 {% for r in rows %}{% set lbl = r.label | title %}| {{ r.start }}{% if r.end != r.start %} → {{ r.end }}{% endif %} | {{ r.start_day[:3] }}{% if r.end != r.start %}–{{ r.end_day[:3] }}{% endif %} | {{ lbl }}{% if r.holiday and (r.holiday | title) != lbl %} — {{ r.holiday }}{% endif %} |
 {% endfor %}
+{%- endif -%}
+{% endmacro %}
+
+{% macro metra_active_trains(lines=none) %}
+{%- set a = metra_active_trains_data(lines) | from_json -%}
+{%- set multi = (a.lines | count) > 1 -%}
+{%- set title = 'network' if lines is none else (a.lines | join(', ') or 'no lines') -%}
+{%- set trains = a.trains -%}
+**Metra {{ title }}** · {{ trains | count }} active · updated {{ a.updated or '—' }}
+
+{% if not trains -%}
+_No {{ title }} trains running right now._
+{%- else -%}
+| Train |{{ ' Line |' if multi else '' }} Dir | Next station | ETA | Delay | Terminal |
+|:--|{{ ':--|' if multi else '' }}:--|:--|--:|--:|:--|
+{% for t in trains -%}
+{%- set d = t.delay_min -%}
+{%- set delay = '—' if d is none else ('on time' if d == 0 else ('+' ~ d ~ 'm' if d > 0 else d ~ 'm')) -%}
+| #{{ t.train }} |{{ (' ' ~ t.line ~ ' |') if multi else '' }} {{ t.direction }} | {{ t.next_station }} | {{ t.eta }} | {{ delay }} | {{ t.destination }}{{ ' ' ~ t.terminal_eta if t.terminal_eta else '' }} |
+{% endfor -%}
 {%- endif -%}
 {% endmacro %}
