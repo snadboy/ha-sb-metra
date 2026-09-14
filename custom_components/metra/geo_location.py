@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.location import distance as geo_distance
 
 from . import MetraCoordinator
-from .const import DOMAIN
+from .const import DOMAIN, STATIC_URL
 from .gtfs import slug
 
 
@@ -32,7 +32,7 @@ class MetraTrainLocation(GeolocationEvent):
         self._train: dict = {}
         self._attr_source = f"metra_{slug(line)}"
         self._attr_name = f"Metra {line} {train['train']}"
-        self._attr_entity_picture = f"/local/metra/engine_{slug(line)}_{train['direction']}.svg?v=2"
+        self._attr_entity_picture = f"{STATIC_URL}/engine_{slug(line)}_{train['direction']}.svg"
         self.update_from(hass, train)
 
     def update_from(self, hass: HomeAssistant, train: dict) -> None:

@@ -1,0 +1,97 @@
+type: sections
+title: Metra
+path: metra
+icon: mdi:train
+max_columns: 2
+sections:
+- type: grid
+  cards:
+  - type: heading
+    heading: Geneva → Chicago OTC
+    heading_style: title
+    icon: mdi:train
+  - type: tile
+    entity: sensor.metra_up_w_next_inbound
+    name: Next from Geneva
+    icon: mdi:train
+    grid_options:
+      columns: 12
+      rows: 1
+  - type: markdown
+    grid_options:
+      columns: full
+      rows: auto
+    content: |-
+      **Upcoming departures**
+      {% set trains = state_attr('sensor.metra_up_w_upcoming_inbound','trains') or [] %}{% if trains | count == 0 %}
+      _No scheduled departures found._
+      {% else %}{% for t in trains %}
+      - **{{ t.display }}** · #{{ t.train }} — {% if t.is_live %}🟢 live{% if t.delay_min %} ({{ '+' if t.delay_min > 0 }}{{ t.delay_min }} min){% endif %}{% else %}per schedule{% endif %}
+      {% endfor %}{% endif %}
+  - type: markdown
+    grid_options:
+      columns: full
+      rows: auto
+    content: |-
+      **En route to Chicago** ({{ states('sensor.metra_up_w_en_route_inbound') }})
+      {% set trains = state_attr('sensor.metra_up_w_en_route_inbound','trains') or [] %}{% if trains | count == 0 %}
+      _No UP-W trains currently between Geneva and Chicago._
+      {% else %}{% for t in trains %}
+      - 🚆 **#{{ t.train }}** → next {{ t.next_station }} {{ t.eta }}{% if t.delay_min %} ({{ '+' if t.delay_min > 0 }}{{ t.delay_min }} min){% endif %} · OTC {{ t.dest_eta }}
+      {% endfor %}{% endif %}
+      _updated {{ state_attr('sensor.metra_up_w_en_route_inbound','updated') }}_
+- type: grid
+  cards:
+  - type: heading
+    heading: Chicago OTC → Geneva
+    heading_style: title
+    icon: mdi:train
+  - type: tile
+    entity: sensor.metra_up_w_next_outbound
+    name: Next from Chicago
+    icon: mdi:train
+    grid_options:
+      columns: 12
+      rows: 1
+  - type: markdown
+    grid_options:
+      columns: full
+      rows: auto
+    content: |-
+      **Upcoming departures**
+      {% set trains = state_attr('sensor.metra_up_w_upcoming_outbound','trains') or [] %}{% if trains | count == 0 %}
+      _No scheduled departures found._
+      {% else %}{% for t in trains %}
+      - **{{ t.display }}** · #{{ t.train }} — {% if t.is_live %}🟢 live{% if t.delay_min %} ({{ '+' if t.delay_min > 0 }}{{ t.delay_min }} min){% endif %}{% else %}per schedule{% endif %}
+      {% endfor %}{% endif %}
+  - type: markdown
+    grid_options:
+      columns: full
+      rows: auto
+    content: |-
+      **En route to Geneva** ({{ states('sensor.metra_up_w_en_route_outbound') }})
+      {% set trains = state_attr('sensor.metra_up_w_en_route_outbound','trains') or [] %}{% if trains | count == 0 %}
+      _No UP-W trains currently between Chicago and Geneva._
+      {% else %}{% for t in trains %}
+      - 🚆 **#{{ t.train }}** → next {{ t.next_station }} {{ t.eta }}{% if t.delay_min %} ({{ '+' if t.delay_min > 0 }}{{ t.delay_min }} min){% endif %} · Geneva {{ t.dest_eta }}
+      {% endfor %}{% endif %}
+      _updated {{ state_attr('sensor.metra_up_w_en_route_outbound','updated') }}_
+- type: grid
+  column_span: 2
+  cards:
+  - type: heading
+    heading: Active trains & maps
+    heading_style: title
+    icon: mdi:map-marker-path
+  - type: button
+    name: Open Metra Maps
+    icon: mdi:map-marker-path
+    show_state: false
+    tap_action:
+      action: navigate
+      navigation_path: /dashboard-monitor/metra-maps
+    grid_options:
+      columns: 12
+      rows: 2
+subview: false
+cards: []

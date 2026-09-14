@@ -1,0 +1,23 @@
+type: sections
+max_columns: 5
+subview: true
+path: metra-up-w
+title: Metra UP-W
+sections:
+- type: grid
+  cards:
+  - type: map
+    grid_options:
+      columns: 72
+      rows: 6
+    show_all: false
+    entities:
+    - entity: zone.elburn_station
+    - entity: zone.ogilvie_otc
+    hours_to_show: 0
+    cluster: false
+    theme_mode: auto
+    geo_location_sources:
+    - metra_up_w
+  column_span: 5
+cards: []

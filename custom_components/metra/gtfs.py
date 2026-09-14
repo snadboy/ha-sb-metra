@@ -11,7 +11,6 @@ feed carrying coordinates but empty stop fields.
 """
 from __future__ import annotations
 
-import json
 import pickle
 import re
 import urllib.request
@@ -21,7 +20,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("America/Chicago")
-CACHE = Path("/config/.metra_mqtt")   # reuse the publisher-era cache
+CACHE = Path(".metra_cache")   # replaced by set_cache_dir() during setup
 N_UPCOMING = 3
 LOOKAHEAD_DAYS = 2
 
@@ -36,6 +35,12 @@ PUBLISHED_URLS = [
 RT_BASE = "https://gtfspublic.metrarr.com/gtfs/public"
 
 DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+
+def set_cache_dir(path: str | Path) -> None:
+    """Point the GTFS cache at a directory; the integration calls this at setup."""
+    global CACHE
+    CACHE = Path(path)
 
 
 def slug(s: str) -> str:

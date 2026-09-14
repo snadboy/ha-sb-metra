@@ -1,0 +1,392 @@
+type: sections
+title: Metra Maps
+path: metra-maps
+icon: mdi:map-marker-path
+max_columns: 2
+sections:
+- type: grid
+  column_span: 2
+  cards:
+  - type: heading
+    heading: All lines
+    heading_style: title
+    icon: mdi:train-variant
+  - type: heading
+    heading: Tap a line for its own map · Bubble Card pop-ups, no select entity — each device keeps its own choice
+    heading_style: subtitle
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: BNSF
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-bnsf'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: HC
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-hc'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: MD-N
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-md-n'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: MD-W
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-md-w'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: ME
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-me'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: NCS
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-ncs'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: RI
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-ri'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: SWS
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-sws'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: UP-N
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-up-n'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: UP-NW
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-up-nw'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: UP-W
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#metra-up-w'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: map
+    geo_location_sources:
+    - metra_bnsf
+    - metra_hc
+    - metra_md_n
+    - metra_md_w
+    - metra_me
+    - metra_ncs
+    - metra_ri
+    - metra_sws
+    - metra_up_n
+    - metra_up_nw
+    - metra_up_w
+    auto_fit: true
+    hours_to_show: 0
+    cluster: false
+    theme_mode: auto
+    scale_ruler: true
+    grid_options:
+      columns: full
+      rows: 8
+- type: grid
+  cards:
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-bnsf'
+    name: Metra BNSF
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_bnsf
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('BNSF') -}}
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-hc'
+    name: Metra HC
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_hc
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('HC') -}}
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-md-n'
+    name: Metra MD-N
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_md_n
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('MD-N') -}}
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-md-w'
+    name: Metra MD-W
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_md_w
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('MD-W') -}}
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-me'
+    name: Metra ME
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_me
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('ME') -}}
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-ncs'
+    name: Metra NCS
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_ncs
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('NCS') -}}
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-ri'
+    name: Metra RI
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_ri
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('RI') -}}
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-sws'
+    name: Metra SWS
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_sws
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('SWS') -}}
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-up-n'
+    name: Metra UP-N
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_up_n
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('UP-N') -}}
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-up-nw'
+    name: Metra UP-NW
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_up_nw
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('UP-NW') -}}
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#metra-up-w'
+    name: Metra UP-W
+    icon: mdi:train
+    cards:
+    - type: map
+      geo_location_sources:
+      - metra_up_w
+      auto_fit: true
+      hours_to_show: 0
+      cluster: false
+      theme_mode: auto
+      scale_ruler: true
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      content: |-
+        {%- from 'metra.jinja' import metra_active_trains -%}
+        {{- metra_active_trains('UP-W') -}}
+  column_span: 2

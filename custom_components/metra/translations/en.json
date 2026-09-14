@@ -28,7 +28,6 @@
   },
   "config_subentries": {
     "favorite": {
-      "title": "Commute pair",
       "step": {
         "user": {
           "title": "Add a commute pair",

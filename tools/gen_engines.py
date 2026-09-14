@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Generate per-line Metra engine map icons from the official GTFS line colors.
 
-Outputs engine_<lineslug>_{inbound,outbound}.svg into --out (default cwd) and a
-customize-yaml block on stdout (entity_picture per map slot entity, 12 slots per
-direction). The inbound template is engine_inbound.svg in this directory (body
-fill #003087 is replaced per line; wordmark flips dark on light line colors).
+Outputs engine_<lineslug>_{inbound,outbound}.svg into --out (default:
+custom_components/metra/www, which the integration serves at /metra_static).
+The inbound template is engine_template.svg in this directory (its body blue
+#0050a0 is replaced per line; the wordmark turns dark on light line colors).
 """
 import re
 import sys
@@ -35,9 +35,9 @@ def mirror(svg):
 
 def main():
     here = Path(__file__).parent
-    out = Path(sys.argv[sys.argv.index("--out") + 1]) if "--out" in sys.argv else Path.cwd()
-    template = (here / "engine_inbound.svg").read_text()
-    lines_cust = []
+    out = (Path(sys.argv[sys.argv.index("--out") + 1]) if "--out" in sys.argv
+           else here.parent / "custom_components" / "metra" / "www")
+    template = (here / "engine_template.svg").read_text()
     for line, color in LINE_COLORS.items():
         sl = slug(line)
         body = template.replace("#0050a0", color)   # the F40PH template's body blue
@@ -46,11 +46,7 @@ def main():
                                 'font-style="italic" fill="#1a1a1a" text-anchor="middle"')
         (out / f"engine_{sl}_inbound.svg").write_text(body)
         (out / f"engine_{sl}_outbound.svg").write_text(mirror(body))
-        for d in ("inbound", "outbound"):
-            for i in range(1, 13):
-                lines_cust.append(f"sensor.metra_{sl}_map_{d}_{i}:\n"
-                                  f"  entity_picture: /local/metra/engine_{sl}_{d}.svg?v=2\n")
-    print("".join(lines_cust))
+    print(f"wrote {2 * len(LINE_COLORS)} icons to {out}")
 
 if __name__ == "__main__":
     main()

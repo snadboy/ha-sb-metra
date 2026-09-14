@@ -1,8 +1,9 @@
 {#
   Metra service browser, tables and data for one Metra line.
-  Source of truth: ~/projects/tools/metra/custom_templates/metra.jinja (claude-env).
-  Deployed copy: /config/custom_templates/metra.jinja -- run
-  homeassistant.reload_custom_templates after changing it.
+  Shipped with the SB Metra integration (github.com/snadboy/ha-sb-metra) as
+  custom_components/metra/templates/metra.jinja. At startup the integration
+  copies it to <config>/custom_templates/metra.jinja and reloads custom
+  templates, so change the repo copy: edits to the installed file are replaced.
 
   LAYOUT: helpers, then the *_data macros, then the renderers.
   The *_data macros hold ALL the schedule logic and emit JSON. Every renderer

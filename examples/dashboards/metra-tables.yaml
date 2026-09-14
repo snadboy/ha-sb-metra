@@ -1,0 +1,1938 @@
+type: sections
+title: Metra Tables
+path: metra-tables
+icon: mdi:table-clock
+max_columns: 2
+sections:
+- type: grid
+  cards:
+  - type: heading
+    heading: Departure board — Geneva → Chicago OTC
+    heading_style: title
+    icon: mdi:table-arrow-right
+  - type: markdown
+    grid_options:
+      columns: full
+      rows: auto
+    content: |-
+      _updated {{ state_attr('sensor.metra_up_w_upcoming_inbound','updated') }}_
+
+      {% set trains = state_attr('sensor.metra_up_w_upcoming_inbound','trains') or [] %}{% if trains | count == 0 %}_No scheduled departures found._{% else %}| Train | Depart | Arrive | Status |
+      |:--|:--|:--|:--|
+      {% for t in trains %}| #{{ t.train }} | {{ t.departure[11:16] }} | {{ t.arrival[11:16] }} | {% if t.is_live %}🟢 live{% if t.delay_min %} +{{ t.delay_min }}m{% endif %}{% else %}scheduled{% endif %} |
+      {% endfor %}{% endif %}
+- type: grid
+  cards:
+  - type: heading
+    heading: Departure board — Chicago OTC → Geneva
+    heading_style: title
+    icon: mdi:table-arrow-left
+  - type: markdown
+    grid_options:
+      columns: full
+      rows: auto
+    content: |-
+      _updated {{ state_attr('sensor.metra_up_w_upcoming_outbound','updated') }}_
+
+      {% set trains = state_attr('sensor.metra_up_w_upcoming_outbound','trains') or [] %}{% if trains | count == 0 %}_No scheduled departures found._{% else %}| Train | Depart | Arrive | Status |
+      |:--|:--|:--|:--|
+      {% for t in trains %}| #{{ t.train }} | {{ t.departure[11:16] }} | {{ t.arrival[11:16] }} | {% if t.is_live %}🟢 live{% if t.delay_min %} +{{ t.delay_min }}m{% endif %}{% else %}scheduled{% endif %} |
+      {% endfor %}{% endif %}
+- type: grid
+  cards:
+  - type: heading
+    heading: Stop-by-stop — next inbound train
+    heading_style: title
+    icon: mdi:map-marker-path
+  - type: markdown
+    grid_options:
+      columns: full
+      rows: auto
+    content: |-
+      {% set t = (state_attr('sensor.metra_up_w_upcoming_inbound','trains') or [None]) | first %}{% if t is none %}_No train scheduled._{% else %}**#{{ t.train }}** · {{ t.departure[11:16] }} → {{ t.arrival[11:16] }}
+
+      | Station | ETA |
+      |:--|:--|
+      {% for s in t.stops %}| {{ s.station }} | {{ s.eta }} |
+      {% endfor %}{% endif %}
+- type: grid
+  cards:
+  - type: heading
+    heading: Stops · next inbound UP-W train
+    heading_style: title
+    icon: mdi:map-marker-path
+  - type: heading
+    heading: metra.jinja → metra_stops_table()
+    heading_style: subtitle
+  - type: markdown
+    grid_options:
+      columns: full
+      rows: auto
+    content: |-
+      {%- from 'metra.jinja' import metra_stops_table -%}
+      {%- set t = state_attr('sensor.metra_up_w_next_inbound','train') -%}
+      {% if t %}{{- metra_stops_table('UP-W', t) | safe -}}{% else %}_No next inbound train._{% endif %}
+- type: grid
+  cards:
+  - type: heading
+    heading: Network active trains
+    heading_style: title
+    icon: mdi:train-variant
+  - type: heading
+    heading: metra.jinja → metra_active_trains() · none = every line, or a list such as ['UP-W','UP-NW']
+    heading_style: subtitle
+  - type: markdown
+    grid_options:
+      columns: full
+      rows: auto
+    entity_id:
+    - sensor.metra_active_trains
+    content: |-
+      {%- from 'metra.jinja' import metra_active_trains -%}
+      {{- metra_active_trains() -}}
+- type: grid
+  column_span: 2
+  cards:
+  - type: heading
+    heading: Timetable grid · UP-W
+    icon: mdi:timetable
+  - type: heading
+    heading: metra.jinja → metra_timetable_grid(line, direction) · stations down, trains across · … passed, blank = no stop
+      · scroll sideways
+    heading_style: subtitle
+  - type: markdown
+    entity_id:
+    - sensor.metra_active_trains
+    - sensor.metra_schedule
+    content: |-
+      {%- from 'metra.jinja' import metra_timetable_grid -%}
+      {{- metra_timetable_grid('UP-W', 'inbound', at=now().strftime('%H:%M')) -}}
+    card_mod:
+      style:
+        ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+          td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+          #fff)); }'
+    grid_options:
+      columns: full
+  - type: markdown
+    entity_id:
+    - sensor.metra_active_trains
+    - sensor.metra_schedule
+    content: |-
+      {%- from 'metra.jinja' import metra_timetable_grid -%}
+      {{- metra_timetable_grid('UP-W', 'outbound', at=now().strftime('%H:%M')) -}}
+    card_mod:
+      style:
+        ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+          td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+          #fff)); }'
+    grid_options:
+      columns: full
+- type: grid
+  column_span: 2
+  cards:
+  - type: heading
+    heading: Per-line macro samples
+    heading_style: title
+    icon: mdi:code-json
+  - type: heading
+    heading: Tap a line · each pop-up runs metra_timetable, metra_pattern_summary, metra_service_calendar and the metra_*_data
+      macros for that line
+    heading_style: subtitle
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: BNSF
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-bnsf'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: HC
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-hc'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: MD-N
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-md-n'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: MD-W
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-md-w'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: ME
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-me'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: NCS
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-ncs'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: RI
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-ri'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: SWS
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-sws'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: UP-N
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-up-n'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: UP-NW
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-up-nw'
+    grid_options:
+      columns: 3
+      rows: 1
+  - type: custom:bubble-card
+    card_type: button
+    button_type: name
+    name: UP-W
+    icon: mdi:train
+    button_action:
+      tap_action:
+        action: navigate
+        navigation_path: '#tables-up-w'
+    grid_options:
+      columns: 3
+      rows: 1
+- type: grid
+  cards:
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-bnsf'
+    name: Metra BNSF · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'BNSF' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'BNSF' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('BNSF', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('BNSF', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'BNSF' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'BNSF' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'BNSF' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-hc'
+    name: Metra HC · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'HC' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'HC' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('HC', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('HC', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'HC' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'HC' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'HC' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-md-n'
+    name: Metra MD-N · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'MD-N' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'MD-N' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('MD-N', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('MD-N', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'MD-N' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'MD-N' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'MD-N' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-md-w'
+    name: Metra MD-W · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'MD-W' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'MD-W' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('MD-W', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('MD-W', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'MD-W' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'MD-W' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'MD-W' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-me'
+    name: Metra ME · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'ME' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'ME' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('ME', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('ME', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'ME' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'ME' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'ME' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-ncs'
+    name: Metra NCS · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'NCS' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'NCS' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('NCS', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('NCS', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'NCS' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'NCS' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'NCS' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-ri'
+    name: Metra RI · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'RI' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'RI' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('RI', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('RI', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'RI' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'RI' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'RI' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-sws'
+    name: Metra SWS · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'SWS' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'SWS' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('SWS', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('SWS', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'SWS' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'SWS' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'SWS' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-up-n'
+    name: Metra UP-N · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'UP-N' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'UP-N' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('UP-N', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('UP-N', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'UP-N' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'UP-N' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'UP-N' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-up-nw'
+    name: Metra UP-NW · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'UP-NW' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'UP-NW' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('UP-NW', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('UP-NW', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'UP-NW' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'UP-NW' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'UP-NW' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#tables-up-w'
+    name: Metra UP-W · macro samples
+    icon: mdi:table-clock
+    cards:
+    - type: heading
+      heading: Timetable · inbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-right
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'UP-W' -%}
+        {{- metra_timetable(ent, 'inbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable · outbound — metra_timetable()
+      heading_style: subtitle
+      icon: mdi:table-arrow-left
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable -%}
+        {%- set ent = 'UP-W' -%}
+        {{- metra_timetable(ent, 'outbound', limit=12) | safe -}}
+    - type: heading
+      heading: Timetable grid · inbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('UP-W', 'inbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Timetable grid · outbound — metra_timetable_grid()
+      heading_style: subtitle
+      icon: mdi:timetable
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_timetable_grid -%}
+        {{- metra_timetable_grid('UP-W', 'outbound', at=now().strftime('%H:%M')) -}}
+      card_mod:
+        style:
+          ha-markdown $: 'table { display: block; overflow-x: auto; white-space: nowrap; } th, td { padding: 2px 8px; } th:first-child,
+            td:first-child { position: sticky; left: 0; z-index: 1; background: var(--ha-card-background, var(--card-background-color,
+            #fff)); }'
+    - type: heading
+      heading: Service patterns — metra_pattern_summary()
+      heading_style: subtitle
+      icon: mdi:calendar-clock
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_summary -%}
+        {%- set ent = 'UP-W' -%}
+        {{- metra_pattern_summary(ent) | safe -}}
+    - type: heading
+      heading: Service calendar — metra_service_calendar()
+      heading_style: subtitle
+      icon: mdi:calendar-range
+    - type: markdown
+      entity_id:
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_service_calendar -%}
+        {%- set ent = 'UP-W' -%}
+        {{- metra_service_calendar(ent) | safe -}}
+    - type: heading
+      heading: Data macros — metra_*_data() · JSON for from_json
+      heading_style: subtitle
+      icon: mdi:code-json
+    - type: markdown
+      entity_id:
+      - sensor.metra_active_trains
+      - sensor.metra_schedule
+      content: |-
+        {%- from 'metra.jinja' import metra_pattern_key, metra_timetable_data, metra_pattern_summary_data, metra_service_calendar_data, metra_stops_table_data, metra_service_browser_data, metra_active_trains_data -%}
+        {%- set line = 'UP-W' -%}
+        {%- set pkey = metra_pattern_key(line) | trim -%}
+        {%- set trains = metra_timetable_data(line, none, pkey) | from_json -%}
+        {%- set live = metra_active_trains_data() | from_json -%}
+        Every `metra_*_data` macro emits JSON; `from_json` turns it into a real list you can filter, sort and aggregate. Each takes a line **name** such as `'{{ line }}'`. Nothing below is reachable from the table macros.
+
+        {% if not trains -%}
+        _No schedule data for {{ line }}._
+        {%- else -%}
+        {%- set pats = metra_pattern_summary_data(line) | from_json -%}
+        {%- set cal = metra_service_calendar_data(line) | from_json -%}
+        {%- set b = metra_service_browser_data(line) | from_json -%}
+        {%- set todays = pats | selectattr('key','eq',pkey) | list -%}
+        {%- set today_lbl = (todays | first).label | title if todays else pkey -%}
+        {%- set n_in = trains | selectattr('direction','eq','inbound') | list | count -%}
+        {%- set n_out = (trains | count) - n_in -%}
+        {%- set n_eve = trains | selectattr('departs','ge','17:00') | list | count -%}
+        {%- set n_org = trains | map(attribute='origin') | unique | list | count -%}
+        {%- set hs = namespace(h=[]) -%}
+        {%- for t in trains %}{% set hs.h = hs.h + [t.departs[:2]] %}{% endfor -%}
+        {%- set ns = namespace(best='', n=0) -%}
+        {%- for h in hs.h | unique %}{% set c = hs.h | select('eq', h) | list | count %}{% if c > ns.n %}{% set ns.n = c %}{% set ns.best = h %}{% endif %}{% endfor -%}
+        {%- set stopcounts = trains | map(attribute='stations') | map('length') | list -%}
+        {%- set first_in = trains | selectattr('direction','eq','inbound') | first -%}
+        {%- set st = (metra_stops_table_data(line, first_in.train, pkey) | from_json) if first_in else none -%}
+        **Schedule · {{ line }}**
+
+        | Derived from `metra_*_data` | |
+        |:--|--:|
+        | Today's service | {{ today_lbl }} |
+        | Trains — inbound / outbound | {{ n_in }} / {{ n_out }} |
+        | Busiest departure hour | {{ ns.best }}:00 — {{ ns.n }} trains |
+        | Stops per train — fewest / most | {{ stopcounts | min }} / {{ stopcounts | max }} |
+        | Departing 17:00 or later | {{ n_eve }} |
+        | Distinct origins | {{ n_org }} |
+        | First inbound train | {% if st %}#{{ st.train }} · {{ st.origin }} {{ st.departs }} → {{ st.destination }} {{ st.arrives }} · {{ st.stations | count }} stops{% else %}—{% endif %} |
+        | Outlook | {{ b.first }} to {{ b.last }} · {{ cal | count }} service blocks · {{ b.patterns | count }} patterns |
+        {%- endif %}
+
+        {% if not live.trains -%}
+        **Live · whole network** — _no Metra trains running right now._
+        {%- else -%}
+        {%- set cnt = namespace(best='', n=0) -%}
+        {%- for l in live.lines %}{% set c = live.trains | selectattr('line','eq', l) | list | count %}{% if c > cnt.n %}{% set cnt.n = c %}{% set cnt.best = l %}{% endif %}{% endfor -%}
+        {%- set timed = live.trains | selectattr('delay_min','number') | list -%}
+        {%- set late = timed | sort(attribute='delay_min', reverse=true) | first -%}
+        {%- set soon = live.trains | sort(attribute='eta') | first -%}
+        **Live · whole network** — `metra_active_trains_data()` · updated {{ live.updated }}
+
+        | Derived from live data | |
+        |:--|--:|
+        | Trains running | {{ live.trains | count }} on {{ live.trains | map(attribute='line') | unique | list | count }} of {{ live.lines | count }} lines |
+        | Busiest line | {{ cnt.best }} — {{ cnt.n }} trains |
+        | Most delayed | {% if late %}#{{ late.train }} {{ late.line }} · {{ '+' if late.delay_min > 0 }}{{ late.delay_min }}m before {{ late.next_station }}{% else %}—{% endif %} |
+        | Running early | {{ timed | selectattr('delay_min','lt',0) | list | count }} |
+        | Next arrival anywhere | #{{ soon.train }} {{ soon.line }} · {{ soon.next_station }} {{ soon.eta }} |
+        {%- endif %}
+
+        Each schedule train is a dict of `{{ trains[0].keys() | list | join('`, `') if trains else '—' }}`; each live train also carries `line` and `terminal_eta`.
+subview: false
+cards: []

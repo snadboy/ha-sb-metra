@@ -1,16 +1,19 @@
 {
   "domain": "metra",
-  "name": "Metra",
+  "name": "SB Metra",
   "codeowners": [
     "@snadboy"
   ],
   "config_flow": true,
-  "dependencies": [],
-  "documentation": "https://github.com/snadboy/claude-env",
+  "dependencies": [
+    "http"
+  ],
+  "documentation": "https://github.com/snadboy/ha-sb-metra",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/snadboy/ha-sb-metra/issues",
   "requirements": [
     "gtfs-realtime-bindings"
   ],
-  "version": "2.0.0"
+  "version": "2.1.0"
 }

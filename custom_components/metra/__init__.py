@@ -9,18 +9,21 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 import logging
+from pathlib import Path
 
 import voluptuous as vol
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.template import async_load_custom_templates
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from . import gtfs
-from .const import DOMAIN
+from .const import CACHE_DIR, DOMAIN, LEGACY_CACHE_DIR, STATIC_URL, TEMPLATE_FILE
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = ["sensor", "geo_location"]
@@ -28,6 +31,29 @@ UPDATE_INTERVAL = timedelta(minutes=2)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 LINES = vol.All(cv.ensure_list, [cv.string])
+HERE = Path(__file__).parent
+
+
+def _prepare_files(config_dir: Path) -> bool:
+    """Point the GTFS cache at <config>/.metra_cache and install the macros.
+
+    A pre-HACS install kept its cache in .metra_mqtt; it is renamed once so the
+    GTFS download is not repeated. The bundled metra.jinja is copied into
+    <config>/custom_templates only when it differs. Returns True when it did.
+    """
+    cache, legacy = config_dir / CACHE_DIR, config_dir / LEGACY_CACHE_DIR
+    if legacy.is_dir() and not cache.exists():
+        legacy.rename(cache)
+    gtfs.set_cache_dir(cache)
+    bundled = (HERE / "templates" / TEMPLATE_FILE).read_bytes()
+    installed = config_dir / "custom_templates" / TEMPLATE_FILE
+    if installed.is_file() and installed.read_bytes() == bundled:
+        return False
+    installed.parent.mkdir(exist_ok=True)
+    partial = installed.with_name(TEMPLATE_FILE + ".partial")
+    partial.write_bytes(bundled)
+    partial.replace(installed)
+    return True
 
 
 class MetraCoordinator(DataUpdateCoordinator):
@@ -141,7 +167,12 @@ async def _answer(hass: HomeAssistant, call: ServiceCall, work, realtime: bool) 
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Register the response actions once, independent of the config entry."""
+    """Install files, serve the map icons, and register the response actions."""
+    if await hass.async_add_executor_job(_prepare_files, Path(hass.config.path())):
+        _LOGGER.info("Installed %s into custom_templates", TEMPLATE_FILE)
+        await async_load_custom_templates(hass)
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(STATIC_URL, str(HERE / "www"), True)])
 
     async def schedule(call: ServiceCall) -> dict:
         return await _answer(hass, call, lambda idx, line, rt, pos: gtfs.schedule_day(
