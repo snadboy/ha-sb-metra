@@ -1,14 +1,19 @@
-# The line comes from the TARGET entity -- target a line's Schedule sensor
-# (sensor.metra_<line>_schedule). Several targets return one result per
-# entity_id, so one call can answer for several lines at once.
+# Every action takes `line`: one Metra line name or a list. The response is
+# always keyed by line name -- response["UP-W"] -- so one call can answer for
+# several lines, and a single-line caller never has to unwrap an entity id.
 schedule:
   name: Schedule
-  description: Every scheduled train on a line for one service day (static timetable).
-  target:
-    entity:
-      domain: sensor
-      integration: metra
+  description: Every scheduled train for one service day (static timetable).
   fields:
+    line:
+      name: Line
+      required: true
+      description: One or more Metra line names.
+      example: UP-W
+      selector:
+        select:
+          multiple: true
+          options: [BNSF, HC, MD-N, MD-W, ME, NCS, RI, SWS, UP-N, UP-NW, UP-W]
     date:
       name: Date
       description: Service day (default today). Weekday and weekend schedules differ.
@@ -18,11 +23,16 @@ schedule:
 arrivals:
   name: Arrivals
   description: Next trains arriving at one station, both directions, live overlay.
-  target:
-    entity:
-      domain: sensor
-      integration: metra
   fields:
+    line:
+      name: Line
+      required: true
+      description: One or more Metra line names.
+      example: UP-W
+      selector:
+        select:
+          multiple: true
+          options: [BNSF, HC, MD-N, MD-W, ME, NCS, RI, SWS, UP-N, UP-NW, UP-W]
     station:
       name: Station
       required: true
@@ -41,11 +51,16 @@ arrivals:
 query:
   name: Next trains
   description: Next trains between two stations on a line (express-aware, live overlay).
-  target:
-    entity:
-      domain: sensor
-      integration: metra
   fields:
+    line:
+      name: Line
+      required: true
+      description: One or more Metra line names.
+      example: UP-W
+      selector:
+        select:
+          multiple: true
+          options: [BNSF, HC, MD-N, MD-W, ME, NCS, RI, SWS, UP-N, UP-NW, UP-W]
     origin:
       name: Origin station
       required: true
@@ -69,11 +84,16 @@ query:
 train:
   name: Train detail
   description: One train's timetable with live overlay (per-stop ETA, passed flags, position, delay). Train numbers differ between weekday and weekend service.
-  target:
-    entity:
-      domain: sensor
-      integration: metra
   fields:
+    line:
+      name: Line
+      required: true
+      description: One or more Metra line names.
+      example: UP-W
+      selector:
+        select:
+          multiple: true
+          options: [BNSF, HC, MD-N, MD-W, ME, NCS, RI, SWS, UP-N, UP-NW, UP-W]
     train:
       name: Train number
       required: true

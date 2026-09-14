@@ -82,10 +82,6 @@ class MetraOptionsFlow(OptionsFlow):
             data_schema=vol.Schema({
                 vol.Required("lines", default=opts.get("lines", ids)): SelectSelector(
                     SelectSelectorConfig(options=ids, multiple=True)),
-                vol.Required("map_lines", default=opts.get("map_lines", ids)): SelectSelector(
-                    SelectSelectorConfig(options=ids, multiple=True)),
-                vol.Required("map_slots", default=opts.get("map_slots", 12)): NumberSelector(
-                    NumberSelectorConfig(min=1, max=12, step=1, mode="box")),
                 vol.Required("span_days", default=opts.get("span_days", 28)): NumberSelector(
                     NumberSelectorConfig(min=7, max=190, step=1, mode="box")),
             }),
@@ -93,7 +89,7 @@ class MetraOptionsFlow(OptionsFlow):
 
 
 class FavoriteSubentryFlow(ConfigSubentryFlow):
-    """Add a commute pair: 6 next/upcoming/en-route sensors on the line device."""
+    """Add a commute pair: 6 next/upcoming/en-route sensors on their own device."""
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         errors: dict[str, str] = {}

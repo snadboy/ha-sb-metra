@@ -1,244 +1,91 @@
-"""Metra sensors: per-line active/schedule, map slots, favorite pairs.
+"""Metra sensors: network-wide active trains and schedule, plus favorite pairs.
 
-Entity ids are pinned to the MQTT-publisher-era ids (set explicitly) so
-dashboards, the delay-push automation, and the customize-free map keep working.
+Consolidated 2026-09-14. Every line lives on two entities of one "Metra"
+service device:
+  sensor.metra_active_trains  state = trains running now      attr lines[<line>] = trains
+  sensor.metra_schedule       state = trains scheduled today  attr lines[<line>] = {days, patterns}
+Favorite commute pairs keep their own device and their publisher-era entity
+ids (the delay-push automation triggers on them). Train positions for maps come
+from the geo_location platform, not from sensors.
 """
 from __future__ import annotations
 
 import logging
-from datetime import date as date_cls, datetime
-
-import voluptuous as vol
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, SupportsResponse
-from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import (config_validation as cv, device_registry as dr,
-                                   entity_platform, entity_registry as er)
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import MetraCoordinator, gtfs
+from . import MetraCoordinator
 from .const import DOMAIN
 from .gtfs import slug
 
 _LOGGER = logging.getLogger(__name__)
 
-
-def _line_device(line: str, routes: list[dict]) -> DeviceInfo:
-    long_name = next((r["name"] for r in routes if r["id"] == line), line)
-    return DeviceInfo(identifiers={(DOMAIN, f"line_{slug(line)}")},
-                      name=f"Metra {line}", manufacturer="Metra GTFS-RT", model=long_name)
-
-
-NETWORK_DEVICE = DeviceInfo(identifiers={(DOMAIN, "network")}, name="Metra Network",
-                            manufacturer="Metra GTFS-RT", model="System roster")
+# Keeps the identifier of the old "Metra Network" device, so the device is
+# renamed in place and select.metra_line stays on it.
+METRA_DEVICE = DeviceInfo(identifiers={(DOMAIN, "network")}, name="Metra",
+                          manufacturer="Metra GTFS-RT", model="All lines",
+                          entry_type=DeviceEntryType.SERVICE)
 
 
 class MetraBase(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
     _attr_icon = "mdi:train"
 
-    def __init__(self, coordinator: MetraCoordinator) -> None:
-        super().__init__(coordinator)
-
-    # ---- entity-bound query actions --------------------------------------
-    # HA registers entity services against the whole PLATFORM, not a class, so
-    # every metra sensor inherits these. Entities that carry a line answer;
-    # the rest reject the call naming the entity to target instead.
-
-    def _svc_line(self) -> str:
-        line = getattr(self, "line", None)
-        if not line:
-            raise ServiceValidationError(
-                f"{self.entity_id} is not tied to a line — target that line's "
-                "Schedule sensor instead, e.g. sensor.metra_up_w_schedule")
-        return line
-
-    async def _svc_idx(self) -> dict:
-        return self.coordinator.idx or await self.hass.async_add_executor_job(gtfs.load_index)
-
-    async def _svc_rt(self):
-        return await self.hass.async_add_executor_job(gtfs.realtime, self.coordinator.token)
-
-    async def _svc_run(self, fn, *args):
-        try:
-            return await self.hass.async_add_executor_job(fn, *args)
-        except ValueError as err:
-            raise ServiceValidationError(str(err)) from err
-
-    @staticmethod
-    def _svc_day(value) -> date_cls:
-        return date_cls.fromisoformat(str(value)) if value else datetime.now(gtfs.TZ).date()
-
-    async def async_svc_schedule(self, date=None) -> dict:
-        line = self._svc_line()
-        return await self._svc_run(gtfs.schedule_day, await self._svc_idx(), line,
-                                   self._svc_day(date))
-
-    async def async_svc_arrivals(self, station: str, n: int = 5) -> dict:
-        line = self._svc_line()
-        idx = await self._svc_idx()
-        rt, _pos = await self._svc_rt()
-        return await self._svc_run(gtfs.arrivals, idx, line, station, rt, int(n))
-
-    async def async_svc_query(self, origin: str, destination: str, n: int = 3) -> dict:
-        line = self._svc_line()
-        idx = await self._svc_idx()
-        rt, _pos = await self._svc_rt()
-        return await self._svc_run(gtfs.query_pair, idx, line, origin, destination, rt, int(n))
-
-    async def async_svc_train(self, train: str, date=None) -> dict:
-        line = self._svc_line()
-        idx = await self._svc_idx()
-        rt, pos = await self._svc_rt()
-        return await self._svc_run(gtfs.train_details, idx, line, str(train),
-                                   self._svc_day(date), rt, pos)
-
 
 class ActiveTrainsSensor(MetraBase):
     _attr_name = "Active trains"
 
-    def __init__(self, coordinator: MetraCoordinator, line: str) -> None:
+    def __init__(self, coordinator: MetraCoordinator) -> None:
         super().__init__(coordinator)
-        self.line = line
-        self._attr_unique_id = f"{DOMAIN}_line_{slug(line)}_active_trains"
-        self._attr_device_info = _line_device(line, coordinator.data["routes"])
-        self.entity_id = f"sensor.metra_{slug(line)}_active_trains"
+        self._attr_unique_id = f"{DOMAIN}_active_trains"
+        self._attr_device_info = METRA_DEVICE
+        self.entity_id = "sensor.metra_active_trains"
 
     @property
-    def available(self) -> bool:
-        return super().available and self.line in self.coordinator.data["active"]
-
-    @property
-    def native_value(self):
-        return len(self.coordinator.data["active"].get(self.line, []))
+    def native_value(self) -> int:
+        return sum(len(trains) for trains in self.coordinator.data["active"].values())
 
     @property
     def extra_state_attributes(self):
-        return {"trains": self.coordinator.data["active"].get(self.line, []),
-                "updated": self.coordinator.data["updated"]}
+        data = self.coordinator.data
+        return {"lines": {line: data["active"].get(line, []) for line in data["lines"]},
+                "updated": data["updated"]}
 
 
-class TodayScheduleSensor(MetraBase):
+class ScheduleSensor(MetraBase):
+    """Every line's timetable outlook.
+
+    Deliberately has no `updated` attribute: the data only changes at midnight,
+    so the ~1.2 MB of attributes stays identical between refreshes and HA does
+    not rewrite the state (or push it to every open browser) every 2 minutes.
+    """
+
     _attr_name = "Schedule"
     _attr_icon = "mdi:timetable"
 
-    def __init__(self, coordinator: MetraCoordinator, line: str) -> None:
+    def __init__(self, coordinator: MetraCoordinator) -> None:
         super().__init__(coordinator)
-        self.line = line
-        self._attr_unique_id = f"{DOMAIN}_line_{slug(line)}_today_schedule"
-        self._attr_device_info = _line_device(line, coordinator.data["routes"])
-        self.entity_id = f"sensor.metra_{slug(line)}_schedule"
+        self._attr_unique_id = f"{DOMAIN}_schedule"
+        self._attr_device_info = METRA_DEVICE
+        self.entity_id = "sensor.metra_schedule"
 
     @property
-    def available(self) -> bool:
-        return super().available and self.line in self.coordinator.data["schedule"]
-
-    @property
-    def native_value(self):
-        return self.coordinator.data["schedule"].get(self.line, {}).get("count", 0)
+    def native_value(self) -> int:
+        return sum(s.get("count", 0) for s in self.coordinator.data["schedule"].values())
 
     @property
     def extra_state_attributes(self):
-        sched = self.coordinator.data["schedule"].get(self.line, {})
-        return {"days": sched.get("days", []), "patterns": sched.get("patterns", {}),
-                "updated": self.coordinator.data["updated"]}
-
-
-def _slot_attrs(t: dict | None, updated: str) -> dict:
-    """Map-slot attributes; lat/lon present only while the slot holds a train."""
-    if not t:
-        return {"updated": updated}
-    return {"latitude": t["latitude"], "longitude": t["longitude"],
-            "heading_to": t["destination"], "next_station": t["next_station"],
-            "next_eta": t["eta"],
-            "dest_eta": (t["stops"][-1]["eta"] if t.get("stops") else "?"),
-            "stops": t.get("stops", []),
-            "updated": updated}
-
-
-class MapSlotSensor(MetraBase):
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def __init__(self, coordinator: MetraCoordinator, line: str, direction: str, i: int) -> None:
-        super().__init__(coordinator)
-        self.line, self.direction, self.i = line, direction, i
-        self._attr_name = f"{direction.capitalize()} {line} {i}"
-        self._attr_unique_id = f"{DOMAIN}_line_{slug(line)}_pos_{direction}_{i}"
-        self._attr_device_info = _line_device(line, coordinator.data["routes"])
-        self._attr_entity_picture = f"/local/metra/engine_{slug(line)}_{direction}.svg?v=2"
-        self.entity_id = f"sensor.metra_{slug(line)}_map_{direction}_{i}"
-
-    def _train(self):
-        trains = [t for t in self.coordinator.data["active"].get(self.line, [])
-                  if t["direction"] == self.direction and t.get("latitude") is not None]
-        return trains[self.i - 1] if self.i <= len(trains) else None
-
-    @property
-    def native_value(self):
-        t = self._train()
-        return t["train"] if t else "none"
-
-    @property
-    def extra_state_attributes(self):
-        return _slot_attrs(self._train(), self.coordinator.data["updated"])
-
-
-class SelectedLineSlotSensor(MetraBase):
-    """Active train N on whichever line select.metra_line points at.
-
-    The per-line map slots pin a map to one line; these follow the selection,
-    so a single map card can show any line's live trains. Live positions only
-    exist for today, so the date select has no bearing on them.
-    """
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def __init__(self, coordinator: MetraCoordinator, i: int) -> None:
-        super().__init__(coordinator)
-        self.i = i
-        self._attr_name = f"Active train {i}"
-        self._attr_unique_id = f"{DOMAIN}_network_active_train_{i}"
-        self._attr_device_info = NETWORK_DEVICE
-        self.entity_id = f"sensor.metra_active_train_{i}"
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        # re-render on a line change, not just on the 2-minute refresh
-        self.async_on_remove(self.coordinator.selection.subscribe(self.async_write_ha_state))
-
-    def _train(self):
-        line = self.coordinator.selection.line
-        if not line:
-            return None
-        live = [t for t in self.coordinator.data["active"].get(line, [])
-                if t.get("latitude") is not None]
-        live.sort(key=lambda t: t["direction"] != "inbound")   # stable: inbound first
-        return live[self.i - 1] if self.i <= len(live) else None
-
-    @property
-    def native_value(self):
-        t = self._train()
-        return t["train"] if t else "none"
-
-    @property
-    def entity_picture(self):
-        t = self._train()
-        if not t:
-            return None
-        return f"/local/metra/engine_{slug(self.coordinator.selection.line)}_{t['direction']}.svg?v=2"
-
-    @property
-    def extra_state_attributes(self):
-        t = self._train()
-        attrs = _slot_attrs(t, self.coordinator.data["updated"])
-        attrs["line"] = self.coordinator.selection.line
-        if t:
-            attrs["direction"] = t["direction"]
-        return attrs
+        data = self.coordinator.data
+        return {"lines": {
+            line: {"days": data["schedule"].get(line, {}).get("days", []),
+                   "patterns": data["schedule"].get(line, {}).get("patterns", {})}
+            for line in data["lines"]}}
 
 
 FAV_KINDS = [
@@ -266,9 +113,8 @@ class FavoriteSensor(MetraBase):
         self.kind, self.data_key, self.is_next = kind, data_key, is_next
         self._attr_name = label
         self._attr_unique_id = f"{DOMAIN}_fav_{subentry_id}_{kind}"
-        # own device: subentry entities must not share the main entry's line
-        # device (a subentry-associated device silently rejects main-entry
-        # entities, wiping out the line's per-line sensors)
+        # own device: subentry entities must not share the main entry's device
+        # (a subentry-associated device silently rejects main-entry entities)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"fav_{subentry_id}")},
             name=f"Metra {line} commute",
@@ -308,43 +154,14 @@ class FavoriteSensor(MetraBase):
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
                             async_add_entities: AddEntitiesCallback) -> None:
     coordinator: MetraCoordinator = hass.data[DOMAIN][entry.entry_id]
-    data = coordinator.data
 
-    # the line is the TARGET, not a string field -- no line validation needed,
-    # and a multi-entity target returns one response per entity_id
-    platform = entity_platform.async_get_current_platform()
-    platform.async_register_entity_service(
-        "schedule", {vol.Optional("date"): cv.string},
-        "async_svc_schedule", supports_response=SupportsResponse.ONLY)
-    platform.async_register_entity_service(
-        "arrivals", {vol.Required("station"): cv.string,
-                     vol.Optional("n", default=5): vol.Coerce(int)},
-        "async_svc_arrivals", supports_response=SupportsResponse.ONLY)
-    platform.async_register_entity_service(
-        "query", {vol.Required("origin"): cv.string, vol.Required("destination"): cv.string,
-                  vol.Optional("n", default=3): vol.Coerce(int)},
-        "async_svc_query", supports_response=SupportsResponse.ONLY)
-    platform.async_register_entity_service(
-        "train", {vol.Required("train"): cv.string, vol.Optional("date"): cv.string},
-        "async_svc_train", supports_response=SupportsResponse.ONLY)
-
-    entities: list[SensorEntity] = []
-    for line in data["lines"]:
-        entities.append(ActiveTrainsSensor(coordinator, line))
-        entities.append(TodayScheduleSensor(coordinator, line))
-    for line in data["map_lines"]:
-        for direction in ("inbound", "outbound"):
-            for i in range(1, coordinator.map_slots + 1):
-                entities.append(MapSlotSensor(coordinator, line, direction, i))
-    # both directions share one numbering here, so twice the per-direction cap
-    for i in range(1, 2 * coordinator.map_slots + 1):
-        entities.append(SelectedLineSlotSensor(coordinator, i))
+    entities: list[SensorEntity] = [ActiveTrainsSensor(coordinator), ScheduleSensor(coordinator)]
     async_add_entities(entities)
 
-    # Drop registry rows for sensors this entry no longer provides: a line
-    # taken out of `lines`/`map_lines`, a lower `map_slots`, a retired sensor
-    # class. Without this they linger as restored "unavailable" entities.
-    # Favorite sensors belong to subentries and are never touched.
+    # Drop registry rows for sensors this entry no longer provides (the per-line
+    # and map-slot sensors retired by the consolidation, or any later retiree).
+    # Without this they linger as restored "unavailable" entities. Favorite
+    # sensors belong to subentries and are never touched.
     ent_reg = er.async_get(hass)
     wanted = {e.unique_id for e in entities}
     stale = [r.entity_id for r in er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -356,25 +173,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
     if stale:
         _LOGGER.info("removed %d stale metra sensor(s): %s", len(stale), ", ".join(stale[:10]))
 
-    # via_device_id wants the parent's REGISTRY id (the (domain, identifier)
-    # via_device form is deprecated, removed in HA 2027.8). async_add_entities
-    # above only schedules registration, so the line device may not exist yet:
-    # get_or_create it on the MAIN entry -- never the subentry, which would
-    # hijack the shared line device. Unconfigured lines get no link, not an
-    # orphan device.
+    # via_device_id wants the parent's REGISTRY id; get_or_create it on the MAIN
+    # entry (never the subentry, which would hijack the shared device).
     dev_reg = dr.async_get(hass)
-
-    def _line_device_id(line: str) -> str | None:
-        if line not in data["lines"]:
-            return None
-        return dev_reg.async_get_or_create(
-            config_entry_id=entry.entry_id, **_line_device(line, data["routes"])).id
+    metra_device_id = dev_reg.async_get_or_create(config_entry_id=entry.entry_id, **METRA_DEVICE).id
 
     for sub in entry.subentries.values():
         if sub.subentry_type != "favorite":
             continue
-        via_id = _line_device_id(sub.data["line"])
         fav_entities = [FavoriteSensor(coordinator, sub.subentry_id, sub.data["line"],
-                                       kind, label, data_key, is_next, via_id)
+                                       kind, label, data_key, is_next, metra_device_id)
                         for kind, label, data_key, is_next in FAV_KINDS]
         async_add_entities(fav_entities, config_subentry_id=sub.subentry_id)
+
+    # Drop this entry's devices that no longer carry anything -- the per-line
+    # devices retired by the consolidation. Keep the Metra device and every
+    # favorite's own device.
+    for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
+        ours = {ident for domain, ident in device.identifiers if domain == DOMAIN}
+        if "network" in ours or any(ident.startswith("fav_") for ident in ours):
+            continue
+        dev_reg.async_remove_device(device.id)
+        _LOGGER.info("removed retired metra device %s", device.name)
