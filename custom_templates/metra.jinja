@@ -181,6 +181,72 @@
 {{- {'lines': wanted | list, 'updated': ns.updated, 'trains': ns.trains} | to_json -}}
 {% endmacro %}
 
+{# Timetable grid: stations down, trains across, like a printed Metra
+   timetable. Station order merges every train's stop list, longest first, so
+   branch stops land beside the trunk. Progress: a train in the live feed has
+   passed each scheduled station missing from its remaining stops; any other
+   train has passed a station once its scheduled time is earlier than `at`
+   ('HH:MM', default now). Trains that have finished are dropped unless
+   include_finished. #}
+{% macro metra_timetable_grid_data(line_ent, direction='inbound', pattern=none, at=none, include_finished=false) %}
+{%- set pkey = metra_pattern_key(line_ent, pattern) | trim -%}
+{%- set at_hm = at or now().strftime('%H:%M') -%}
+{%- set trains = metra_timetable_data(line_ent, direction, pattern) | from_json -%}
+{%- set live = (state_attr('sensor.metra_active_trains', 'lines') or {}).get(line_ent) or [] -%}
+{%- set order = namespace(s=[]) -%}
+{%- for t in trains | sort(attribute='stops', reverse=true) -%}
+{%- set m = namespace(prev=-1, pending=[]) -%}
+{%- for st in t.stations -%}
+{%- if st.station in order.s -%}
+{%- set i = order.s.index(st.station) -%}
+{%- set order.s = order.s[:i] + m.pending + order.s[i:] -%}
+{%- set m.prev = i + (m.pending | count) -%}
+{%- set m.pending = [] -%}
+{%- else -%}
+{%- set m.pending = m.pending + [st.station] -%}
+{%- endif -%}
+{%- endfor -%}
+{%- set order.s = order.s[:m.prev + 1] + m.pending + order.s[m.prev + 1:] -%}
+{%- endfor -%}
+{%- set ns = namespace(cols=[]) -%}
+{%- for t in trains -%}
+{%- set lt = live | selectattr('train', 'eq', t.train) | selectattr('direction', 'eq', t.direction) | list -%}
+{%- set active = (lt | count) > 0 -%}
+{%- if active or include_finished or t.arrives >= at_hm -%}
+{%- set remaining = (lt[0].stops | map(attribute='station') | list) if active else [] -%}
+{%- set tm = dict(zip(t.stations | map(attribute='station') | list, t.stations | map(attribute='time') | list)) -%}
+{%- set c = namespace(l=[]) -%}
+{%- for name in order.s -%}
+{%- if name in tm -%}
+{%- set hm = tm[name] -%}
+{%- set h = (hm[:2] | int) % 24 -%}
+{%- set c.l = c.l + [{
+      'time': ((h + 11) % 12 + 1) ~ hm[2:],
+      'scheduled': hm,
+      'past': (name not in remaining) if active else (hm < at_hm),
+      'next': active and name == lt[0].next_station }] -%}
+{%- else -%}
+{%- set c.l = c.l + [none] -%}
+{%- endif -%}
+{%- endfor -%}
+{%- set dm = 'AM' if ((t.departs[:2] | int) % 24) < 12 else 'PM' -%}
+{%- set am = 'AM' if ((t.arrives[:2] | int) % 24) < 12 else 'PM' -%}
+{%- set ns.cols = ns.cols + [{
+      'train': t.train, 'origin': t.origin, 'destination': t.destination,
+      'departs': t.departs, 'arrives': t.arrives,
+      'ampm': dm if dm == am else dm ~ '–' ~ am,
+      'active': active,
+      'delay_min': lt[0].delay_min if active else none,
+      'next_station': lt[0].next_station if active else none,
+      'cells': c.l }] -%}
+{%- endif -%}
+{%- endfor -%}
+{{- {'line': line_ent, 'direction': direction, 'pattern': pkey or none,
+     'label': (metra_service_label(line_ent, pkey) | trim) if pkey else none,
+     'at': at_hm, 'updated': state_attr('sensor.metra_active_trains', 'updated'),
+     'stations': order.s, 'trains': ns.cols} | to_json -}}
+{% endmacro %}
+
 {# ---- renderers: formatting only ----------------------------------------- #}
 
 {% macro metra_service_browser(line_ent, on_date=none) %}
@@ -279,6 +345,24 @@ _Train #{{ train_no }} is not in the {{ (metra_service_label(line_ent, pkey) | t
 |--:|:--|--:|
 {% for s in t.stations %}| {{ loop.index }} | {{ s.station }} | {{ s.time }} |
 {% endfor %}
+{%- endif -%}
+{% endmacro %}
+
+{% macro metra_timetable_grid(line_ent, direction='inbound', pattern=none, at=none, include_finished=false) %}
+{%- set g = metra_timetable_grid_data(line_ent, direction, pattern, at, include_finished) | from_json -%}
+**{{ ('Metra ' ~ line_ent) }}** · {{ (g.label or 'no service') | title }} · {{ direction | title }}{% if g.updated %} · live {{ g.updated }}{% endif %}
+
+{% if not g.stations -%}
+_No {{ direction }} {{ line_ent }} service {{ 'for pattern ' ~ pattern if pattern else 'today' }}._
+{%- elif not g.trains -%}
+_No more {{ direction }} {{ line_ent }} trains today._
+{%- else -%}
+| |{% for t in g.trains %} {{ t.train }} |{% endfor %}
+|:--|{% for t in g.trains %}--:|{% endfor %}
+| **{{ g.stations[0] }} to {{ g.stations[-1] }}** |{% for t in g.trains %} {{ t.ampm }} |{% endfor %}
+{% for name in g.stations %}{% set r = loop.index0 %}| {{ name }} |{% for t in g.trains %}{% set cell = t.cells[r] %} {% if cell is none %} {% elif cell.past %}…{% elif cell.next %}**{{ cell.time }}**{% else %}{{ cell.time }}{% endif %} |{% endfor %}
+{% endfor %}
+_… passed · **bold** next stop of a running train · blank does not stop_
 {%- endif -%}
 {% endmacro %}
 
