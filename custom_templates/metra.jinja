@@ -195,7 +195,7 @@
 {% if not b.in_outlook %}
 _No service data for {{ on_date }} — outside the published outlook ({{ b.first }} → {{ b.last }})._
 {% else %}
-{%- set pats = b.patterns %}
+{%- set pats = b.patterns %}{% set budget = namespace(left=240000) %}
 
 {% if not sel_day %}
 <details>
@@ -206,7 +206,7 @@ _No service data for {{ on_date }} — outside the published outlook ({{ b.first
 </details>
 {% endif %}
 {% for p in pats %}
-{%- set trains = p.trains %}
+{%- set trains = p.trains %}{% set full %}
 <br>
 <details>
 <summary><code>  <b>{% if sel_day %}{{ sel_day.day[:3] }}, {{ sel_day.date | replace('-','.') }} · {% endif %}{{ p.label | title }}</b> — {{ p.count }} trains{% if p.in_effect %} · in effect now{% endif %}{% if sel_day and sel_day.holiday is defined %} · {{ sel_day.holiday }}{% endif %}</code></summary>
@@ -226,7 +226,22 @@ _No service data for {{ on_date }} — outside the published outlook ({{ b.first
 {% endfor %}
 
 </details>
-{% endfor %}
+{% endset %}
+{%- if full | length <= budget.left %}{% set budget.left = budget.left - (full | length) %}{{ full }}{% else %}{% set brief %}
+<br>
+<details>
+<summary><code>  <b>{% if sel_day %}{{ sel_day.day[:3] }}, {{ sel_day.date | replace('-','.') }} · {% endif %}{{ p.label | title }}</b> — {{ p.count }} trains{% if p.in_effect %} · in effect now{% endif %}{% if sel_day and sel_day.holiday is defined %} · {{ sel_day.holiday }}{% endif %}</code></summary>
+
+<code>    <i>Stop lists omitted to stay under HA's 256 KiB template limit — pass a date to see this service in full.</i></code><br>
+{%- for t in trains %}
+{%- if loop.changed(t.direction) %}
+<code>    <b><i>{{ t.direction|upper }}</i></b></code><br>
+{%- endif %}
+<code>    {{ '%-5s'|format('#' ~ t.train) | replace(' ', ' ') }}  {{ t.departs }} → {{ t.arrives }}  {{ t.origin | replace(' ', ' ') }} → {{ t.destination | replace(' ', ' ') }}</code><br>
+{%- endfor %}
+
+</details>
+{% endset %}{% set budget.left = budget.left - (brief | length) %}{{ brief }}{% endif %}{% endfor %}
 {% endif %}
 {% else %}
 _Schedule data not loaded for {{ line_ent }}._
