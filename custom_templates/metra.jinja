@@ -67,8 +67,8 @@
       'count': p.count,
       'inbound': p.trains | selectattr('direction','eq','inbound') | list | count,
       'outbound': p.trains | selectattr('direction','eq','outbound') | list | count,
-      'first': deps | first,
-      'last': deps | last }] -%}
+      'first': deps[0] if deps else none,
+      'last': deps[-1] if deps else none }] -%}
 {%- endfor -%}
 {{- ns.rows | to_json -}}
 {% endmacro %}
@@ -275,7 +275,7 @@ _No schedule data for {{ line_ent }}._
 {%- else -%}
 | Service | Trains | In | Out | First | Last |
 |:--|--:|--:|--:|--:|--:|
-{% for r in rows %}| {{ r.label | title }}{% if r.today %} (today){% endif %} | {{ r.count }} | {{ r.inbound }} | {{ r.outbound }} | {{ r.first }} | {{ r.last }} |
+{% for r in rows %}| {{ r.label | title }}{% if r.today %} (today){% endif %} | {{ r.count }} | {{ r.inbound }} | {{ r.outbound }} | {{ r.first or '—' }} | {{ r.last or '—' }} |
 {% endfor %}
 {%- endif -%}
 {% endmacro %}
