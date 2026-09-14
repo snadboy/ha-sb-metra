@@ -381,6 +381,11 @@ def active_trains(idx, line, rt_line, pos_line):
     out = []
     for tok, tu in rt_line.items():
         stops = list(tu.stop_time_update)
+        # A train with no remaining stop that still has a predicted time has
+        # effectively arrived -- the feed keeps it briefly with no ETA. Drop it
+        # so tables and maps never show a "?" row. Also guards an empty list.
+        if not any(stu_time(u) for u in stops):
+            continue
         nxt = stops[0]
         tid, st = static_trip_for(idx, line, tok)
         if st:

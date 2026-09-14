@@ -23,7 +23,7 @@ from . import gtfs
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = ["select", "sensor", "geo_location"]
+PLATFORMS = ["sensor", "geo_location"]
 UPDATE_INTERVAL = timedelta(minutes=2)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 

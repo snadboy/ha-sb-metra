@@ -27,7 +27,7 @@ from .gtfs import slug
 _LOGGER = logging.getLogger(__name__)
 
 # Keeps the identifier of the old "Metra Network" device, so the device is
-# renamed in place and select.metra_line stays on it.
+# renamed in place rather than replaced.
 METRA_DEVICE = DeviceInfo(identifiers={(DOMAIN, "network")}, name="Metra",
                           manufacturer="Metra GTFS-RT", model="All lines",
                           entry_type=DeviceEntryType.SERVICE)
@@ -158,14 +158,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
     entities: list[SensorEntity] = [ActiveTrainsSensor(coordinator), ScheduleSensor(coordinator)]
     async_add_entities(entities)
 
-    # Drop registry rows for sensors this entry no longer provides (the per-line
-    # and map-slot sensors retired by the consolidation, or any later retiree).
+    # Drop registry rows for entities this entry no longer provides: the per-line
+    # and map-slot sensors retired by the consolidation, select.metra_line (line
+    # choice now lives in dashboard pop-ups), or any later retiree.
     # Without this they linger as restored "unavailable" entities. Favorite
     # sensors belong to subentries and are never touched.
     ent_reg = er.async_get(hass)
     wanted = {e.unique_id for e in entities}
     stale = [r.entity_id for r in er.async_entries_for_config_entry(ent_reg, entry.entry_id)
-             if r.domain == "sensor" and r.config_subentry_id is None
+             if r.domain in ("sensor", "select") and r.config_subentry_id is None
              and not r.unique_id.startswith(f"{DOMAIN}_fav_")
              and r.unique_id not in wanted]
     for entity_id in stale:
