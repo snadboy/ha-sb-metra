@@ -78,8 +78,13 @@ examples/dashboards/       exported views (YAML)
 ## Status
 
 - [x] Repo split, HACS layout, brand icons, hacs.json, validation workflow, README
-- [ ] User reviews README, then: GitHub release v2.1.0, add as HACS custom repo,
-      cut the live install over from hand-copied files to HACS
-- [ ] After cutover: delete `/config/www/metra` (icons now served by the
-      integration) and the old `metra.jinja.bak*` copies
+- [x] v2.1.0 released; live install CUT OVER to HACS (2026-09-14): HACS custom repo,
+      entry/subentry/entities unchanged, 99/99 macro fingerprints identical,
+      `.metra_mqtt` renamed to `.metra_cache`, macros reinstalled by startup code,
+      icons served at `/metra_static`, brand icon shown on the integration page
+- [x] Removed `/config/www/metra` and the `metra.jinja.bak*` copies. Fallbacks kept:
+      HA backup `6b28776a`, `/config/backups_metra_pre_hacs_*`
+- Updating from now on: change code → bump manifest version → tag + GitHub release →
+  update in HACS → restart. `scripts/deploy.sh` is only for testing before a release
+  (HACS will show the install as modified until the next release is installed).
 - [x] MIT license (HACS validation requires one)
