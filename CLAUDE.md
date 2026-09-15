@@ -74,6 +74,15 @@ examples/dashboards/       exported views (YAML)
 - Registry: sensor setup purges this entry's stale rows and retired devices itself.
 - `integration_entities('metra')` hides registry orphans; count from `states` or the registry.
 - REST calls that raise ServiceValidationError return HTTP 500 (HA core api handler), UI is fine.
+- **Stale train markers after a reconnect (frontend bug, proven 2026-09-15)**: home-assistant-js-websocket
+  9.6.0 (frontend 20260826.7, HA 2026.9.2) merges the `subscribe_entities` snapshot it gets after a reconnect
+  into the old store (`{...store.state}` + additions) and never deletes entities that are gone, so any
+  geo_location entity REMOVED while a client was disconnected (HA restart, network blip, tab hidden >5 min,
+  phone/laptop sleep) stays in that client's `hass.states` and on its maps until a page reload. Probe: create
+  a state via REST, `conn.suspendReconnectUntil(p); conn.suspend()`, DELETE it, resolve p → still present.
+  9.7.0 does not change it; no upstream issue found. A marker only disappears for a reconnecting client if the
+  entity still EXISTS at reconnect time with updated (location-less) attributes — GeolocationEvent omits
+  latitude/longitude when None, and the map card skips entities without numeric coordinates.
 - **Icon in the HACS store list stays a placeholder**: HACS 2.0.5 (latest; its frontend is dormant) loads
   row icons straight from `brands.home-assistant.io/_/metra/icon.png`, not HA's Brands Proxy API, so the local
   `brand/` folder only shows on Home Assistant's own pages. The home-assistant/brands repo no longer accepts
