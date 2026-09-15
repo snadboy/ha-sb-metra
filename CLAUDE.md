@@ -18,6 +18,7 @@ custom_components/metra/   everything HACS installs
   sensor.py                sensor.metra_active_trains, sensor.metra_schedule, commute-pair sensors
   geo_location.py          one entity per positioned train (source metra_<line>)
   gtfs.py                  sync GTFS static + realtime logic (call via executor)
+  diagnostics.py           Download diagnostics (token redacted)
   config_flow.py           token flow, options (lines, span_days), commute-pair subentries
   templates/metra.jinja    macros; copied to <config>/custom_templates at startup
   www/engine_*.svg         22 map icons, served at /metra_static

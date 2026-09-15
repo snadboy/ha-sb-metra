@@ -172,6 +172,13 @@ expander layouts. Some cards use HACS cards
 sensors, and two zones (`zone.elburn_station`, `zone.ogilvie_otc`) you would
 replace with your own.
 
+## Diagnostics
+
+Settings → Devices & services → SB Metra → **Download diagnostics** gives the
+configured lines and options, what the last refresh produced per line, the GTFS
+cache contents and the schedule version. The API token is redacted. Attach it to
+a bug report.
+
 ## Recorder
 
 The sensors carry large, fast-changing attributes and the map entities churn
