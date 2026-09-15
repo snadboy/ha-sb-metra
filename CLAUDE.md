@@ -74,6 +74,11 @@ examples/dashboards/       exported views (YAML)
 - Registry: sensor setup purges this entry's stale rows and retired devices itself.
 - `integration_entities('metra')` hides registry orphans; count from `states` or the registry.
 - REST calls that raise ServiceValidationError return HTTP 500 (HA core api handler), UI is fine.
+- **Icon in the HACS store list stays a placeholder**: HACS 2.0.5 (latest; its frontend is dormant) loads
+  row icons straight from `brands.home-assistant.io/_/metra/icon.png`, not HA's Brands Proxy API, so the local
+  `brand/` folder only shows on Home Assistant's own pages. The home-assistant/brands repo no longer accepts
+  NEW `custom_integrations/<domain>/` folders (a workflow auto-closes such PRs), so there is no fix on our side.
+  Icon source: `tools/brand_icon.svg` → render 256/512 px PNGs, optimize losslessly (pyoxipng).
 
 ## Status
 
