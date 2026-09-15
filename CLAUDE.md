@@ -102,6 +102,9 @@ examples/dashboards/       exported views (YAML)
   update in HACS → restart. `scripts/deploy.sh` is only for testing before a release
   (HACS will show the install as modified until the next release is installed).
 - [x] MIT license (HACS validation requires one)
-- [ ] v2.2.0: finished trains are PARKED (no coordinates, `status: finished`) instead of removed, and purged
-      at 03:30 (no train runs 02:30-04:00 in the GTFS schedule; BNSF #1200 departs 04:00). Verify the first
-      overnight purge ran: after 03:30 every `geo_location.metra_*` should have `status: running`.
+- [x] v2.2.0 released 2026-09-15 and installed through HACS: finished trains are PARKED (no coordinates,
+      `status: finished`) instead of removed, and purged at 03:30 (no train runs 02:30-04:00 in the GTFS
+      schedule; BNSF #1200 departs 04:00). Hidden-tab test: 9 trains finished, 0 stale markers on resume.
+- [ ] Verify the first overnight purge ran: after 03:30 every `geo_location.metra_*` should have `status: running`.
+      Known gap: parked entities do not survive a restart, so a browser connected across a restart can keep
+      pre-restart trains until reloaded.
