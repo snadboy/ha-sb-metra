@@ -194,6 +194,8 @@ The engine icons are served from the integration folder at `/metra_static/`.
 
 ## Development
 
+- `tools/brand_icon.svg` is the source of the integration icon in
+  `custom_components/metra/brand/` (256 and 512 px PNGs).
 - `tools/gen_engines.py` regenerates the 22 line-colored icons in
   `custom_components/metra/www/` from `tools/engine_template.svg`.
 - `scripts/deploy.sh` copies the integration to a Home Assistant host over SSH
