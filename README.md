@@ -65,11 +65,17 @@ midnight, so it is not rewritten on every refresh.
 
 ### Map (`geo_location`)
 
-Every running train with a position becomes `geo_location.metra_<line>_<train>`,
-created and removed as trains start and finish. The `source` is
-`metra_<line>` with the line lowercased and `-` turned into `_` (`metra_up_w`).
-Attributes: `line`, `train`, `direction`, `destination`, `next_station`, `eta`,
-`delay_min`, `terminal_eta`.
+Every running train with a position becomes `geo_location.metra_<line>_<train>`.
+The `source` is `metra_<line>` with the line lowercased and `-` turned into `_`
+(`metra_up_w`). Attributes: `line`, `train`, `direction`, `status` (`running`),
+`destination`, `next_station`, `eta`, `delay_min`, `terminal_eta`.
+
+When a train finishes, its entity stays until about 3:30 AM with no coordinates
+and `status: finished`, so maps stop drawing it. It is kept rather than deleted
+because the Home Assistant frontend keeps showing entities that were deleted
+while a browser was disconnected (after a restart, a network drop, or a tab left
+in the background), until the page is reloaded. Filter on `status: running` if
+you list these entities yourself.
 
 ```yaml
 type: map
