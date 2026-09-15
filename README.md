@@ -201,3 +201,7 @@ The engine icons are served from the integration folder at `/metra_static/`.
 - GitHub Actions runs hassfest and the HACS validator on every push.
 - Releases are GitHub releases tagged `vX.Y.Z`, matching `version` in
   `manifest.json`; HACS offers the latest one.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

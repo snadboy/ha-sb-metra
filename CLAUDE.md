@@ -82,4 +82,4 @@ examples/dashboards/       exported views (YAML)
       cut the live install over from hand-copied files to HACS
 - [ ] After cutover: delete `/config/www/metra` (icons now served by the
       integration) and the old `metra.jinja.bak*` copies
-- [ ] License not chosen yet
+- [x] MIT license (HACS validation requires one)
