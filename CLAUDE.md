@@ -113,7 +113,11 @@ examples/dashboards/       exported views (YAML)
       publication is downloaded — compared against `.metra_cache/seen_version.txt` so a schedule
       published while HA was down still fires on the first refresh after startup; `sensor.metra_schedule`
       gains a `published` attribute. HA-side consumer: `automation.metra_new_schedule_push`
-      (replace-in-place tag `metra-schedule-published`, channel Metra). v2.3.1: the event is
-      DEFERRED to EVENT_HOMEASSISTANT_STARTED when detected during startup — the first refresh
-      runs before automations attach their triggers, so firing immediately was silently missed
-      (proven: v2.3.0's startup-path event left last_triggered empty; the live-refresh path pushed fine).
+      (replace-in-place tag `metra-schedule-published`, channel Metra). Startup path took three
+      fixes, each proven by a seeded-marker restart test: v2.3.1 defers the event to
+      EVENT_HOMEASSISTANT_STARTED (the first refresh runs before automations attach triggers);
+      v2.3.2 gates on `hass.state is CoreState.running` (`is_running` is ALREADY TRUE during
+      CoreState.starting, so v2.3.1 never deferred); v2.3.3 makes the listener `@callback`
+      (a bare lambda is a SYNC listener run in a worker thread, where `async_fire` is rejected
+      as thread-unsafe — helpers.frame warning, event lost). BOTH paths verified 2026-09-18:
+      live-refresh push at 15:39Z, post-restart deferred push at 15:56Z, no frame warnings.
