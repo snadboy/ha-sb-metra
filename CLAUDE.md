@@ -109,8 +109,11 @@ examples/dashboards/       exported views (YAML)
 - [ ] Verify the first overnight purge ran: after 03:30 every `geo_location.metra_*` should have `status: running`.
       Known gap: parked entities do not survive a restart, so a browser connected across a restart can keep
       pre-restart trains until reloaded.
-- [x] v2.3.0: `metra_schedule_published` event (old_version/new_version) when a new GTFS
+- [x] v2.3.0 + v2.3.1: `metra_schedule_published` event (old_version/new_version) when a new GTFS
       publication is downloaded — compared against `.metra_cache/seen_version.txt` so a schedule
       published while HA was down still fires on the first refresh after startup; `sensor.metra_schedule`
       gains a `published` attribute. HA-side consumer: `automation.metra_new_schedule_push`
-      (replace-in-place tag `metra-schedule-published`, channel Metra).
+      (replace-in-place tag `metra-schedule-published`, channel Metra). v2.3.1: the event is
+      DEFERRED to EVENT_HOMEASSISTANT_STARTED when detected during startup — the first refresh
+      runs before automations attach their triggers, so firing immediately was silently missed
+      (proven: v2.3.0's startup-path event left last_triggered empty; the live-refresh path pushed fine).
