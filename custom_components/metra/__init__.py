@@ -16,7 +16,7 @@ import voluptuous as vol
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
-from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.core import CoreState, HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.template import async_load_custom_templates
@@ -147,13 +147,13 @@ class MetraCoordinator(DataUpdateCoordinator):
             payload = data["new_schedule"]
             _LOGGER.info("Metra published a new schedule: %s (was %s)",
                          payload["new_version"], payload["old_version"])
-            if self.hass.is_running:
+            # A publication that landed while HA was down is detected on the
+            # FIRST refresh, before automations have attached their triggers —
+            # firing then is silently missed. Defer to startup-complete.
+            # NOT hass.is_running: that is True already during CoreState.starting.
+            if self.hass.state is CoreState.running:
                 self.hass.bus.async_fire(f"{DOMAIN}_schedule_published", payload)
             else:
-                # A publication that landed while HA was down is detected on the
-                # FIRST refresh, before automations have attached their triggers
-                # (they attach noticeably after the API is up) — firing now
-                # would be silently missed. Defer to startup-complete.
                 self.hass.bus.async_listen_once(
                     EVENT_HOMEASSISTANT_STARTED,
                     lambda _event: self.hass.bus.async_fire(
