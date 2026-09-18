@@ -84,6 +84,8 @@ class MetraCoordinator(DataUpdateCoordinator):
             "routes": self.idx["routes"],
             "lines": self._lines(),
             "updated": now.strftime("%H:%M"),
+            "version": self.idx["version"],
+            "new_schedule": self._check_new_schedule(self.idx["version"]),
             "active": {}, "schedule": {}, "favorites": {},
         }
         span_key = (today.isoformat(), self.idx["version"], tuple(data["lines"]), self.span_days)
@@ -119,11 +121,32 @@ class MetraCoordinator(DataUpdateCoordinator):
             }
         return data
 
+    def _check_new_schedule(self, version: str) -> dict | None:
+        """Detect a new GTFS publication, surviving restarts.
+
+        Compares against a marker file in the cache dir (not the previous
+        in-memory data), so a schedule published while HA was down is still
+        announced on the first refresh after startup. First-ever run just
+        writes the marker and stays quiet.
+        """
+        marker = gtfs.CACHE / "seen_version.txt"
+        prev = marker.read_text().strip() if marker.exists() else None
+        if prev != version:
+            marker.write_text(version)
+        if prev and prev != version:
+            return {"old_version": prev, "new_version": version}
+        return None
+
     async def _async_update_data(self) -> dict:
         try:
-            return await self.hass.async_add_executor_job(self._compute)
+            data = await self.hass.async_add_executor_job(self._compute)
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(str(err)) from err
+        if data["new_schedule"]:
+            _LOGGER.info("Metra published a new schedule: %s (was %s)",
+                         data["new_schedule"]["new_version"], data["new_schedule"]["old_version"])
+            self.hass.bus.async_fire(f"{DOMAIN}_schedule_published", data["new_schedule"])
+        return data
 
 
 # ---- response actions ------------------------------------------------------

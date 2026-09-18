@@ -58,10 +58,32 @@ entity ids are built from the line name.
 | Entity | State | Attributes |
 |---|---|---|
 | `sensor.metra_active_trains` | trains running now, all lines | `lines`: `{line: [trains]}`, each train with `train`, `direction`, `destination`, `next_station`, `eta`, `delay_min`, `latitude`, `longitude`, remaining `stops` (`station`, `eta`); `updated` |
-| `sensor.metra_schedule` | trains scheduled today, all lines | `lines`: `{line: {days, patterns}}`. `days` lists each service day with its pattern key (`weekday`, `saturday`, `sunday` or a holiday date); `patterns` holds each pattern's trains with every stop time |
+| `sensor.metra_schedule` | trains scheduled today, all lines | `published`: version string of the GTFS schedule in use; `lines`: `{line: {days, patterns}}`. `days` lists each service day with its pattern key (`weekday`, `saturday`, `sunday` or a holiday date); `patterns` holds each pattern's trains with every stop time |
 
 Data refreshes every 2 minutes. `sensor.metra_schedule` only changes at
-midnight, so it is not rewritten on every refresh.
+midnight (or when Metra publishes a new schedule), so it is not rewritten on
+every refresh.
+
+### Events
+
+When Metra publishes a new schedule, the next refresh downloads it and fires
+**`metra_schedule_published`** on the event bus with `old_version` /
+`new_version`. The check survives restarts (the last-seen version is kept in
+the cache dir), so a schedule published while HA was down is still announced.
+Metra adds holiday service (e.g. Thanksgiving, Christmas) only in later
+publications — this event is the moment those flags appear, so it is a good
+trigger for a notification:
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: metra_schedule_published
+actions:
+  - action: notify.mobile_app_your_phone
+    data:
+      title: "🚆 Metra published a new schedule"
+      message: "Now on {{ trigger.event.data.new_version }} — check upcoming service changes"
+```
 
 ### Map (`geo_location`)
 
@@ -200,7 +222,7 @@ recorder:
 
 | Path | Purpose |
 |---|---|
-| `<config>/.metra_cache/` | downloaded GTFS schedule and its parsed index; refreshed when Metra publishes a new schedule |
+| `<config>/.metra_cache/` | downloaded GTFS schedule, its parsed index, and the last-seen schedule version (`seen_version.txt`, drives `metra_schedule_published`); refreshed when Metra publishes a new schedule |
 | `<config>/custom_templates/metra.jinja` | the macros (replaced when the bundled copy changes) |
 
 The engine icons are served from the integration folder at `/metra_static/`.

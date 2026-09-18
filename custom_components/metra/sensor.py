@@ -61,8 +61,9 @@ class ActiveTrainsSensor(MetraBase):
 class ScheduleSensor(MetraBase):
     """Every line's timetable outlook.
 
-    Deliberately has no `updated` attribute: the data only changes at midnight,
-    so the ~1.2 MB of attributes stays identical between refreshes and HA does
+    Deliberately has no `updated` attribute: the data only changes at midnight
+    (or when Metra publishes a new schedule — the `published` attribute), so
+    the ~1.2 MB of attributes stays identical between refreshes and HA does
     not rewrite the state (or push it to every open browser) every 2 minutes.
     """
 
@@ -82,7 +83,8 @@ class ScheduleSensor(MetraBase):
     @property
     def extra_state_attributes(self):
         data = self.coordinator.data
-        return {"lines": {
+        return {"published": data.get("version"),
+                "lines": {
             line: {"days": data["schedule"].get(line, {}).get("days", []),
                    "patterns": data["schedule"].get(line, {}).get("patterns", {})}
             for line in data["lines"]}}
