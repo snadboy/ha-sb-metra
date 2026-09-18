@@ -16,7 +16,7 @@ import voluptuous as vol
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
-from homeassistant.core import CoreState, HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.core import CoreState, HomeAssistant, ServiceCall, SupportsResponse, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.template import async_load_custom_templates
@@ -154,10 +154,13 @@ class MetraCoordinator(DataUpdateCoordinator):
             if self.hass.state is CoreState.running:
                 self.hass.bus.async_fire(f"{DOMAIN}_schedule_published", payload)
             else:
-                self.hass.bus.async_listen_once(
-                    EVENT_HOMEASSISTANT_STARTED,
-                    lambda _event: self.hass.bus.async_fire(
-                        f"{DOMAIN}_schedule_published", payload))
+                # Must be @callback: a plain function here is a sync listener,
+                # runs in a worker thread, and async_fire from there is rejected.
+                @callback
+                def _fire_deferred(_event) -> None:
+                    self.hass.bus.async_fire(f"{DOMAIN}_schedule_published", payload)
+
+                self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _fire_deferred)
         return data
 
 
